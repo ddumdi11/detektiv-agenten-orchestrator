@@ -1,0 +1,335 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Detective Agent Orchestrator - Interrogation API",
+    "version": "1.0.0",
+    "description": "Internal API contracts for interrogation orchestration (IPC-based)"
+  },
+  "paths": {
+    "/interrogation/start": {
+      "post": {
+        "operationId": "startInterrogation",
+        "summary": "Start new interrogation session",
+        "description": "Initiates a new detective-witness interrogation (FR-019)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["hypothesis", "iterationLimit", "detectiveProvider", "witnessModel"],
+                "properties": {
+                  "hypothesis": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The question or statement to investigate"
+                  },
+                  "iterationLimit": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 20,
+                    "description": "Maximum number of Q&A iterations (FR-010a)"
+                  },
+                  "detectiveProvider": {
+                    "type": "string",
+                    "enum": ["openai", "anthropic", "gemini"],
+                    "description": "Cloud LLM provider to use as detective"
+                  },
+                  "witnessModel": {
+                    "type": "string",
+                    "description": "Ollama model name (e.g., 'llama2')"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["sessionId", "status"],
+                  "properties": {
+                    "sessionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "Unique session identifier"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["running"],
+                      "description": "Initial status is always 'running'"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (missing credentials, invalid iteration limit)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "409": {
+            "description": "Another session is already running (FR-029)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "503": {
+            "description": "Detective or witness service unavailable (FR-025)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/interrogation/stop": {
+      "post": {
+        "operationId": "stopInterrogation",
+        "summary": "Stop running interrogation session",
+        "description": "Terminates active interrogation (FR-020)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["sessionId"],
+                "properties": {
+                  "sessionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session stopped, partial results returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "partialResults"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["failed"],
+                      "description": "Manually stopped sessions marked as 'failed'"
+                    },
+                    "partialResults": {
+                      "$ref": "#/components/schemas/InterrogationSession"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found or not running"
+          }
+        }
+      }
+    },
+    "/interrogation/status/{sessionId}": {
+      "get": {
+        "operationId": "getInterrogationStatus",
+        "summary": "Get real-time interrogation progress",
+        "description": "Returns current state of running interrogation (FR-011, FR-012)",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current interrogation state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["currentIteration", "qaPairs", "status"],
+                  "properties": {
+                    "currentIteration": {
+                      "type": "integer",
+                      "description": "Current iteration number (1-based)"
+                    },
+                    "qaPairs": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/QuestionAnswerPair" },
+                      "description": "All Q&A pairs so far"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["running", "completed", "failed", "limit-reached"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "InterrogationSession": {
+        "type": "object",
+        "required": ["id", "hypothesis", "startTime", "status", "iterationLimit", "currentIteration", "qaPairs", "auditTrail"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "hypothesis": { "$ref": "#/components/schemas/Hypothesis" },
+          "startTime": { "type": "string", "format": "date-time" },
+          "endTime": { "type": "string", "format": "date-time" },
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "failed", "limit-reached"]
+          },
+          "iterationLimit": { "type": "integer", "minimum": 5, "maximum": 20 },
+          "currentIteration": { "type": "integer", "minimum": 0 },
+          "qaPairs": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/QuestionAnswerPair" }
+          },
+          "auditResult": { "$ref": "#/components/schemas/AuditResult" },
+          "auditTrail": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AuditTrailEntry" }
+          }
+        }
+      },
+      "Hypothesis": {
+        "type": "object",
+        "required": ["text", "createdAt"],
+        "properties": {
+          "text": { "type": "string", "minLength": 1 },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "QuestionAnswerPair": {
+        "type": "object",
+        "required": ["sequence", "question", "answer", "timestamp", "gapAnalysis", "providerUsed"],
+        "properties": {
+          "sequence": { "type": "integer", "minimum": 1 },
+          "question": { "type": "string" },
+          "answer": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "gapAnalysis": { "$ref": "#/components/schemas/GapAnalysis" },
+          "providerUsed": {
+            "type": "string",
+            "pattern": "^[a-z]+:[a-z0-9-]+$",
+            "description": "Format: 'provider:model' (e.g., 'openai:gpt-4o')"
+          }
+        }
+      },
+      "GapAnalysis": {
+        "type": "object",
+        "required": ["gaps", "completenessScore", "requiresFollowUp"],
+        "properties": {
+          "gaps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["category", "description", "severity"],
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "enum": ["missing_information", "ambiguity", "inconsistency", "vagueness"]
+                },
+                "description": { "type": "string", "minLength": 1 },
+                "severity": {
+                  "type": "string",
+                  "enum": ["low", "medium", "high"]
+                }
+              }
+            }
+          },
+          "completenessScore": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "requiresFollowUp": { "type": "boolean" }
+        }
+      },
+      "AuditResult": {
+        "type": "object",
+        "required": ["consistencyScore", "contradictions", "remainingGaps", "summary"],
+        "properties": {
+          "consistencyScore": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "contradictions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["qaPairIndexes", "description"],
+              "properties": {
+                "qaPairIndexes": {
+                  "type": "array",
+                  "items": { "type": "integer", "minimum": 0 },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "description": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
+          "remainingGaps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["category", "description"],
+              "properties": {
+                "category": { "type": "string" },
+                "description": { "type": "string" }
+              }
+            }
+          },
+          "summary": { "type": "string", "minLength": 1 }
+        }
+      },
+      "AuditTrailEntry": {
+        "type": "object",
+        "required": ["timestamp", "event", "reason"],
+        "properties": {
+          "timestamp": { "type": "string", "format": "date-time" },
+          "event": {
+            "type": "string",
+            "enum": ["provider_switch", "timeout", "error"]
+          },
+          "fromProvider": { "type": "string" },
+          "toProvider": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "details": { "type": "object" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,156 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Detective Agent Orchestrator - Configuration API",
+    "version": "1.0.0",
+    "description": "Application configuration management"
+  },
+  "paths": {
+    "/config/credentials": {
+      "put": {
+        "operationId": "updateCredentials",
+        "summary": "Update API credentials",
+        "description": "Sets or updates cloud provider API keys (FR-030, FR-032)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["provider", "apiKey", "model"],
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": ["openai", "anthropic", "gemini"]
+                  },
+                  "apiKey": {
+                    "type": "string",
+                    "minLength": 20,
+                    "description": "Will be encrypted before storage"
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "Model name (e.g., 'gpt-4o', 'claude-sonnet-4')"
+                  },
+                  "isDefault": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Set as default detective provider"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credentials updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "properties": {
+                    "status": { "type": "string", "enum": ["success"] }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid API key or validation failed (FR-005)"
+          }
+        }
+      }
+    },
+    "/config/timeouts": {
+      "put": {
+        "operationId": "updateTimeouts",
+        "summary": "Set timeout preferences",
+        "description": "Configure API call timeouts (FR-034, FR-035)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["cloudTimeout", "localTimeout"],
+                "properties": {
+                  "cloudTimeout": {
+                    "type": "integer",
+                    "minimum": 15,
+                    "maximum": 120,
+                    "description": "Cloud LLM timeout in seconds"
+                  },
+                  "localTimeout": {
+                    "type": "integer",
+                    "minimum": 15,
+                    "maximum": 360,
+                    "description": "Local LLM (Ollama) timeout in seconds"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Timeouts updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "properties": {
+                    "status": { "type": "string", "enum": ["success"] }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid timeout values"
+          }
+        }
+      }
+    },
+    "/config/fallback-order": {
+      "put": {
+        "operationId": "updateFallbackOrder",
+        "summary": "Set provider fallback order",
+        "description": "Configure which providers to use as fallback (FR-028b)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["providers"],
+                "properties": {
+                  "providers": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["openai", "anthropic", "gemini"]
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "description": "Ordered list of providers (first = primary)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Fallback order updated"
+          },
+          "400": {
+            "description": "Invalid provider list or unconfigured provider"
+          }
+        }
+      }
+    }
+  }
+}

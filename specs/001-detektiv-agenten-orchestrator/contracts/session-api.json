@@ -1,0 +1,93 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Detective Agent Orchestrator - Session Management API",
+    "version": "1.0.0",
+    "description": "Session persistence and retrieval contracts"
+  },
+  "paths": {
+    "/sessions": {
+      "get": {
+        "operationId": "listSessions",
+        "summary": "List all saved sessions",
+        "description": "Returns metadata of all interrogation sessions (FR-022)",
+        "responses": {
+          "200": {
+            "description": "List of sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["sessions"],
+                  "properties": {
+                    "sessions": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/SessionListItem" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{sessionId}": {
+      "get": {
+        "operationId": "getSession",
+        "summary": "Load specific session",
+        "description": "Retrieves complete session data (FR-023)",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Full session data",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InterrogationSession" }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SessionListItem": {
+        "type": "object",
+        "required": ["id", "hypothesis", "startTime", "status"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "hypothesis": { "type": "string" },
+          "startTime": { "type": "string", "format": "date-time" },
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "failed", "limit-reached"]
+          },
+          "consistencyScore": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Only present if status is 'completed'"
+          }
+        }
+      },
+      "InterrogationSession": {
+        "$ref": "./interrogation-api.json#/components/schemas/InterrogationSession"
+      }
+    }
+  }
+}
