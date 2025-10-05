@@ -101,6 +101,11 @@ describe('POST /interrogation/start', () => {
 
         const response = await global.ipcRenderer.invoke('interrogation:start', request);
         expect(response.sessionId).toBeDefined();
+
+        // Stop session to comply with single-active-session constraint
+        await global.ipcRenderer.invoke('interrogation:stop', {
+          sessionId: response.sessionId,
+        });
       }
     });
   });
