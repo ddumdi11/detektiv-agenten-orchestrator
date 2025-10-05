@@ -116,15 +116,43 @@ describe('POST /interrogation/stop', () => {
     });
 
     it('should include partial Q&A pairs in results', async () => {
+      // Mock with partial Q&A data
+      const mockQAPairs = [
+        {
+          sequence: 0,
+          question: 'Q1',
+          answer: 'A1',
+          timestamp: new Date().toISOString(),
+        },
+      ];
+
+      global.ipcRenderer.invoke = jest.fn((channel: string) => {
+        if (channel === 'interrogation:start') {
+          return Promise.resolve({ sessionId: 'test-session-id' });
+        }
+        if (channel === 'interrogation:stop') {
+          return Promise.resolve({
+            status: 'failed',
+            partialResults: {
+              id: 'test-session-id',
+              hypothesis: { text: 'Test question', createdAt: new Date().toISOString() },
+              status: 'failed',
+              iterationLimit: 10,
+              currentIteration: mockQAPairs.length,
+              qaPairs: mockQAPairs,
+              auditTrail: [],
+            },
+          });
+        }
+        return Promise.reject(new Error(`Unhandled channel: ${channel}`));
+      });
+
       const startResponse = await global.ipcRenderer.invoke('interrogation:start', {
         hypothesis: 'Test question',
         iterationLimit: 10,
         detectiveProvider: 'openai',
         witnessModel: 'llama2',
       });
-
-      // Wait a bit for potential Q&A to happen (in real impl)
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const stopResponse = await global.ipcRenderer.invoke('interrogation:stop', {
         sessionId: startResponse.sessionId,

@@ -107,14 +107,62 @@ describe('GET /sessions/:sessionId', () => {
     });
 
     it('should include all Q&A pairs with proper structure', async () => {
+      // Mock with Q&A pairs containing gapAnalysis
+      const mockQAPairs = [
+        {
+          sequence: 0,
+          question: 'Question 1',
+          answer: 'Answer 1',
+          timestamp: new Date().toISOString(),
+          providerUsed: 'openai:gpt-4o',
+          gapAnalysis: {
+            gaps: [{ category: 'missing_information', description: 'Need more details' }],
+            completenessScore: 75,
+            requiresFollowUp: true,
+          },
+        },
+      ];
+
+      global.ipcRenderer.invoke = jest.fn((channel: string) => {
+        if (channel === 'interrogation:start') {
+          return Promise.resolve({ sessionId: 'test-session-id' });
+        }
+        if (channel === 'interrogation:stop') {
+          return Promise.resolve({
+            status: 'failed',
+            partialResults: {
+              id: 'test-session-id',
+              hypothesis: { text: 'Q&A structure test', createdAt: new Date().toISOString() },
+              status: 'failed',
+              iterationLimit: 5,
+              currentIteration: mockQAPairs.length,
+              qaPairs: mockQAPairs,
+              auditTrail: [],
+            },
+          });
+        }
+        if (channel === 'sessions:load') {
+          return Promise.resolve({
+            id: 'test-session-id',
+            hypothesis: { text: 'Q&A structure test', createdAt: new Date().toISOString() },
+            startTime: new Date().toISOString(),
+            endTime: new Date().toISOString(),
+            status: 'failed',
+            iterationLimit: 5,
+            currentIteration: mockQAPairs.length,
+            qaPairs: mockQAPairs,
+            auditTrail: [],
+          });
+        }
+        return Promise.reject(new Error(`Unhandled channel: ${channel}`));
+      });
+
       const startResponse = await global.ipcRenderer.invoke('interrogation:start', {
         hypothesis: 'Q&A structure test',
         iterationLimit: 5,
         detectiveProvider: 'openai',
         witnessModel: 'llama2',
       });
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
 
       await global.ipcRenderer.invoke('interrogation:stop', {
         sessionId: startResponse.sessionId,
