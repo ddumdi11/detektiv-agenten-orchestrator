@@ -12,6 +12,18 @@ interface QAPair {
 }
 
 describe('GET /interrogation/status/:sessionId', () => {
+  // Store original mock to restore after each test
+  let originalInvoke: any;
+
+  beforeEach(() => {
+    originalInvoke = global.ipcRenderer.invoke;
+  });
+
+  afterEach(() => {
+    // Restore original mock to prevent test pollution
+    global.ipcRenderer.invoke = originalInvoke;
+  });
+
   describe('Request validation', () => {
     it('should accept valid sessionId', async () => {
       // Start a session first
@@ -128,9 +140,19 @@ describe('GET /interrogation/status/:sessionId', () => {
         if (channel === 'interrogation:status') {
           statusCallCount++;
           // Simulate progression: iteration 0 → iteration 1
+          const currentIter = statusCallCount - 1;
+          const mockPairs = Array(currentIter)
+            .fill(null)
+            .map((_, i) => ({
+              sequence: i,
+              question: `Q${i + 1}`,
+              answer: `A${i + 1}`,
+              timestamp: new Date().toISOString(),
+            }));
+
           return Promise.resolve({
-            currentIteration: statusCallCount - 1,
-            qaPairs: [],
+            currentIteration: currentIter,
+            qaPairs: mockPairs, // Length matches currentIteration
             status: statusCallCount > 2 ? 'completed' : 'running',
           });
         }

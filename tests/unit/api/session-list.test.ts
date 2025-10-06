@@ -4,6 +4,16 @@
  */
 
 describe('GET /sessions', () => {
+  let originalInvoke: any;
+
+  beforeEach(() => {
+    originalInvoke = global.ipcRenderer.invoke;
+  });
+
+  afterEach(() => {
+    global.ipcRenderer.invoke = originalInvoke;
+  });
+
   describe('Response schema validation (FR-022)', () => {
     it('should return sessions array', async () => {
       const response = await global.ipcRenderer.invoke('sessions:list');
@@ -70,7 +80,40 @@ describe('GET /sessions', () => {
 
   describe('Session ordering', () => {
     it('should return sessions sorted by startTime descending (newest first)', async () => {
-      // Create multiple sessions
+      // Mock deterministic session ordering without setTimeout
+      const now = new Date();
+      const earlier = new Date(now.getTime() - 60000); // 1 minute earlier
+
+      const mockSessions = [
+        {
+          id: 'session-2',
+          hypothesis: 'Second question',
+          startTime: now.toISOString(),
+          status: 'completed',
+          consistencyScore: 85,
+        },
+        {
+          id: 'session-1',
+          hypothesis: 'First question',
+          startTime: earlier.toISOString(),
+          status: 'completed',
+          consistencyScore: 90,
+        },
+      ];
+
+      global.ipcRenderer.invoke = jest.fn((channel: string) => {
+        if (channel === 'interrogation:start') {
+          return Promise.resolve({ sessionId: 'test-session-id' });
+        }
+        if (channel === 'interrogation:stop') {
+          return Promise.resolve({ status: 'success' });
+        }
+        if (channel === 'sessions:list') {
+          return Promise.resolve({ sessions: mockSessions });
+        }
+        return Promise.reject(new Error(`Unhandled channel: ${channel}`));
+      });
+
       const session1 = await global.ipcRenderer.invoke('interrogation:start', {
         hypothesis: 'First question',
         iterationLimit: 5,
@@ -81,8 +124,6 @@ describe('GET /sessions', () => {
       await global.ipcRenderer.invoke('interrogation:stop', {
         sessionId: session1.sessionId,
       });
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const session2 = await global.ipcRenderer.invoke('interrogation:start', {
         hypothesis: 'Second question',
