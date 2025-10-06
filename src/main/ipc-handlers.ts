@@ -133,6 +133,29 @@ export const ipcHandlers = {
     };
   },
 
+  'interrogation:status': async (event: IpcMainInvokeEvent, sessionId: any) => {
+    // Validate sessionId
+    if (!sessionId) {
+      throw new Error('sessionId is required');
+    }
+    if (typeof sessionId !== 'string' || !isValidUUID(sessionId)) {
+      throw new Error('sessionId is invalid UUID');
+    }
+
+    // Find session
+    const session = sessions.get(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    // Return status information
+    return {
+      currentIteration: session.currentIteration,
+      qaPairs: session.qaPairs,
+      status: session.status,
+    };
+  },
+
   'interrogation:stop': async (event: IpcMainInvokeEvent, args: any) => {
     // Validate request
     if (!args || typeof args !== 'object') {
