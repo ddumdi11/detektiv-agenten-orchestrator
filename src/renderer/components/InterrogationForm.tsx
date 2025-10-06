@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface InterrogationFormProps {
   onStartInterrogation: (config: {
@@ -17,7 +17,23 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
   const [hypothesis, setHypothesis] = useState('');
   const [iterationLimit, setIterationLimit] = useState(10);
   const [detectiveProvider, setDetectiveProvider] = useState<'openai' | 'anthropic' | 'gemini'>('anthropic');
-  const [witnessModel, setWitnessModel] = useState('default');
+  const [witnessModel, setWitnessModel] = useState('');
+
+  // Load default witness workspace on mount
+  useEffect(() => {
+    const loadDefaults = async () => {
+      try {
+        const defaultWitness = await window.electronAPI.config.getDefaultWitness();
+        if (defaultWitness) {
+          setWitnessModel(defaultWitness);
+        }
+      } catch (error) {
+        console.error('Failed to load default witness:', error);
+      }
+    };
+
+    loadDefaults();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
