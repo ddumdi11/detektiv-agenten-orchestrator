@@ -144,19 +144,31 @@ export const ipcHandlers = {
         witnessModel,
         iterationLimit,
         sessionId,
-      }).catch((error) => {
-        // Update session on error
-        const failedSession = sessions.get(sessionId);
-        if (failedSession) {
-          failedSession.status = 'failed';
-          failedSession.endTime = new Date().toISOString();
-          failedSession.auditTrail.push({
-            timestamp: new Date().toISOString(),
-            event: 'error',
-            reason: error.message || 'Unknown error',
-          });
-        }
-      });
+      })
+        .then(() => {
+          // Update session on successful completion
+          const completedSession = sessions.get(sessionId);
+          if (completedSession) {
+            completedSession.status = 'completed';
+            completedSession.endTime = new Date().toISOString();
+            completedSession.currentIteration = iterationLimit;
+            // Note: auditTrail is for exceptional events only (provider_switch, timeout, error)
+            // Normal completion doesn't need an audit entry
+          }
+        })
+        .catch((error) => {
+          // Update session on error
+          const failedSession = sessions.get(sessionId);
+          if (failedSession) {
+            failedSession.status = 'failed';
+            failedSession.endTime = new Date().toISOString();
+            failedSession.auditTrail.push({
+              timestamp: new Date().toISOString(),
+              event: 'error',
+              reason: error.message || 'Unknown error',
+            });
+          }
+        });
     }
 
     return {
