@@ -115,16 +115,17 @@ export class DetectiveAgent {
 Return ONLY the question, nothing else.`;
 
     // TODO: Call LLM API (OpenAI/Anthropic/Gemini)
-    // For now, return simple question based on strategy
+    // For now, use hypothesis directly or adapt based on strategy
     switch (this.currentStrategy) {
       case 'breadth-first':
-        return `What are the main aspects of "${hypothesis}"?`;
+        return `What are the main aspects of this topic?`;
       case 'depth-first':
-        return `What happens during "${hypothesis}"?`;
+        // Use hypothesis directly if it's already a question
+        return hypothesis;
       case 'contradiction':
-        return `What specific effects does "${hypothesis}" have?`;
+        return `What specific facts are mentioned about this?`;
       case 'timeline':
-        return `What is the sequence of events in "${hypothesis}"?`;
+        return `What is the sequence or process described?`;
     }
   }
 
