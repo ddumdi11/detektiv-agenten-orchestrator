@@ -62,6 +62,10 @@ export class DetectiveAgent {
     conversationHistory: ConversationTurn[];
     finalStrategy: QuestioningStrategy;
   }> {
+    // Reset instance state for fresh interrogation
+    this.conversationHistory = [];
+    this.currentStrategy = this.config.initialStrategy || 'breadth-first';
+
     let iteration = 0;
     const allFindings: string[] = [];
 
@@ -174,16 +178,16 @@ Ask about the sequence, process, or timeline of what happens. Return ONLY the qu
       }
     }
 
-    // Fallback if LLM not available
+    // Fallback if LLM not available - include hypothesis in all questions
     switch (this.currentStrategy) {
       case 'breadth-first':
-        return `What are the main aspects of this topic?`;
+        return `What are the main aspects of this topic: ${hypothesis}?`;
       case 'depth-first':
         return hypothesis;
       case 'contradiction':
-        return `What specific facts are mentioned about this?`;
+        return `What specific facts are mentioned about: ${hypothesis}?`;
       case 'timeline':
-        return `What is the sequence or process described?`;
+        return `What is the sequence or process described in: ${hypothesis}?`;
     }
   }
 

@@ -3,18 +3,29 @@
  * Tests the AnythingLLM integration for answering questions
  */
 
+import * as dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
 describe('WitnessAgent', () => {
   describe('Basic functionality', () => {
     it(
       'should answer a simple question',
       async () => {
+        // Skip test if environment variables not set
+        if (!process.env.ANYTHINGLLM_API_KEY || !process.env.WITNESS_WORKSPACE_SLUG) {
+          console.warn('Skipping test: ANYTHINGLLM_API_KEY or WITNESS_WORKSPACE_SLUG not set');
+          return;
+        }
+
         // Arrange
         const { WitnessAgent } = await import('../../../src/agents/WitnessAgent');
 
         const agent = new WitnessAgent({
-          apiKey: 'YX8K6D2-C8X4BZ6-JMXX9PG-2RXC8PB',
-          baseUrl: 'http://localhost:3001',
-          workspaceSlug: 'mynearlydryottobretrial',
+          apiKey: process.env.ANYTHINGLLM_API_KEY,
+          baseUrl: process.env.ANYTHINGLLM_BASE_URL || 'http://localhost:3001',
+          workspaceSlug: process.env.WITNESS_WORKSPACE_SLUG,
         });
 
         // Act
@@ -28,8 +39,8 @@ describe('WitnessAgent', () => {
       300000
     ); // 5 minute timeout for local LLM response
 
-    it('should throw error if API key is missing', () => {
-      const { WitnessAgent } = require('../../../src/agents/WitnessAgent');
+    it('should throw error if API key is missing', async () => {
+      const { WitnessAgent } = await import('../../../src/agents/WitnessAgent');
 
       expect(() => {
         new WitnessAgent({
@@ -40,8 +51,8 @@ describe('WitnessAgent', () => {
       }).toThrow(/apiKey.*required/i);
     });
 
-    it('should throw error if workspace slug is missing', () => {
-      const { WitnessAgent } = require('../../../src/agents/WitnessAgent');
+    it('should throw error if workspace slug is missing', async () => {
+      const { WitnessAgent } = await import('../../../src/agents/WitnessAgent');
 
       expect(() => {
         new WitnessAgent({
@@ -67,12 +78,18 @@ describe('WitnessAgent', () => {
     });
 
     it('should handle invalid API key', async () => {
+      // Skip test if environment not set up
+      if (!process.env.ANYTHINGLLM_BASE_URL || !process.env.WITNESS_WORKSPACE_SLUG) {
+        console.warn('Skipping test: Environment variables not set');
+        return;
+      }
+
       const { WitnessAgent } = await import('../../../src/agents/WitnessAgent');
 
       const agent = new WitnessAgent({
         apiKey: 'invalid-key-12345',
-        baseUrl: 'http://localhost:3001',
-        workspaceSlug: 'mynearlydryottobretrial',
+        baseUrl: process.env.ANYTHINGLLM_BASE_URL,
+        workspaceSlug: process.env.WITNESS_WORKSPACE_SLUG,
       });
 
       await expect(agent.ask('Test question')).rejects.toThrow(/unauthorized|401/i);
