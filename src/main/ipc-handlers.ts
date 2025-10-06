@@ -116,6 +116,11 @@ export const ipcHandlers = {
       throw new Error('Another interrogation session is already running');
     }
 
+    // Ensure orchestrator is ready before creating session (prevents phantom sessions)
+    if (!orchestrator) {
+      throw new Error('Orchestrator not initialized - main window may not be ready');
+    }
+
     // Create new session
     const sessionId = randomUUID();
     const session: InterrogationSession = {
@@ -135,11 +140,6 @@ export const ipcHandlers = {
     };
 
     sessions.set(sessionId, session);
-
-    // Start interrogation in background using orchestrator
-    if (!orchestrator) {
-      throw new Error('Orchestrator not initialized - main window may not be ready');
-    }
 
     orchestrator.startInterrogation({
         hypothesis,
