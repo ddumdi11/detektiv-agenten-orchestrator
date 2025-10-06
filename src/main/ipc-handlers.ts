@@ -137,8 +137,11 @@ export const ipcHandlers = {
     sessions.set(sessionId, session);
 
     // Start interrogation in background using orchestrator
-    if (orchestrator) {
-      orchestrator.startInterrogation({
+    if (!orchestrator) {
+      throw new Error('Orchestrator not initialized - main window may not be ready');
+    }
+
+    orchestrator.startInterrogation({
         hypothesis,
         detectiveProvider,
         witnessModel,
@@ -169,7 +172,6 @@ export const ipcHandlers = {
             });
           }
         });
-    }
 
     return {
       sessionId,
