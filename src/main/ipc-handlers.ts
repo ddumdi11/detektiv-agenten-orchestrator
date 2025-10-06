@@ -3,8 +3,9 @@
  * These handlers process requests from the renderer process
  */
 
-import { IpcMainInvokeEvent } from 'electron';
+import { IpcMainInvokeEvent, BrowserWindow } from 'electron';
 import { randomUUID } from 'crypto';
+import { InterrogationOrchestrator } from './InterrogationOrchestrator';
 
 // In-memory session store (temporary - will be replaced with proper storage)
 interface InterrogationSession {
@@ -49,6 +50,14 @@ const sessions = new Map<string, InterrogationSession>();
 
 // Export for testing - allows tests to clear state between runs
 export const clearSessions = () => sessions.clear();
+
+// Global orchestrator instance (will be initialized when window is created)
+let orchestrator: InterrogationOrchestrator | null = null;
+
+// Initialize orchestrator with main window
+export const initializeOrchestrator = (mainWindow: BrowserWindow) => {
+  orchestrator = new InterrogationOrchestrator(mainWindow);
+};
 
 // Helper: Validate UUID format
 const isValidUUID = (uuid: string): boolean => {
@@ -126,6 +135,29 @@ export const ipcHandlers = {
     };
 
     sessions.set(sessionId, session);
+
+    // Start interrogation in background using orchestrator
+    if (orchestrator) {
+      orchestrator.startInterrogation({
+        hypothesis,
+        detectiveProvider,
+        witnessModel,
+        iterationLimit,
+        sessionId,
+      }).catch((error) => {
+        // Update session on error
+        const failedSession = sessions.get(sessionId);
+        if (failedSession) {
+          failedSession.status = 'failed';
+          failedSession.endTime = new Date().toISOString();
+          failedSession.auditTrail.push({
+            timestamp: new Date().toISOString(),
+            event: 'error',
+            reason: error.message || 'Unknown error',
+          });
+        }
+      });
+    }
 
     return {
       sessionId,
@@ -285,6 +317,11 @@ export const ipcHandlers = {
     // Check if session is running
     if (session.status !== 'running') {
       throw new Error('Session is not running');
+    }
+
+    // Stop orchestrator if running
+    if (orchestrator) {
+      orchestrator.stopInterrogation(sessionId);
     }
 
     // Update session status
