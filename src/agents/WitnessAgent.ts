@@ -34,6 +34,8 @@ export class WitnessAgent {
   async ask(question: string): Promise<string> {
     const url = `${this.baseUrl}/api/v1/workspace/${this.workspaceSlug}/chat`;
 
+    console.log(`[WitnessAgent] Sending question to AnythingLLM: "${question}"`);
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -46,6 +48,8 @@ export class WitnessAgent {
       }),
     });
 
+    console.log(`[WitnessAgent] Response status: ${response.status}`);
+
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
         throw new Error('Unauthorized: Invalid API key (401)');
@@ -55,10 +59,14 @@ export class WitnessAgent {
 
     const data = await response.json();
 
+    console.log(`[WitnessAgent] Full response:`, JSON.stringify(data, null, 2));
+
     // AnythingLLM returns { textResponse: "..." }
     if (!data.textResponse) {
       throw new Error('Invalid response from AnythingLLM: missing textResponse');
     }
+
+    console.log(`[WitnessAgent] Extracted answer: "${data.textResponse}"`);
 
     return data.textResponse;
   }
