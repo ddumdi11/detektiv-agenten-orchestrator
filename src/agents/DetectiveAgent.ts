@@ -106,9 +106,12 @@ export class DetectiveAgent {
       if (nextMove.newStrategy) {
         console.log(`[Strategy Switch] ${this.currentStrategy} → ${nextMove.newStrategy}`);
         this.currentStrategy = nextMove.newStrategy;
+        // Regenerate question for new strategy instead of using generic fallback
+        currentQuestion = await this.generateInitialQuestion(hypothesis);
+      } else {
+        currentQuestion = nextMove.nextQuestion;
       }
 
-      currentQuestion = nextMove.nextQuestion;
       iteration++;
     }
 
