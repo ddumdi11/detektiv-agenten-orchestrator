@@ -3,7 +3,7 @@
  * This test MUST FAIL initially (TDD) - no implementation exists yet
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 interface QAPair {
   sequence: number;
@@ -60,7 +60,7 @@ describe('GET /interrogation/status/:sessionId', () => {
     });
 
     it('should return 404 for non-existent session', async () => {
-      const nonExistentId = uuidv4();
+      const nonExistentId = randomUUID();
 
       await expect(
         global.ipcRenderer.invoke('interrogation:status', nonExistentId)

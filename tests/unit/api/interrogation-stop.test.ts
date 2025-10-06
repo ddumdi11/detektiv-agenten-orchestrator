@@ -3,9 +3,20 @@
  * This test MUST FAIL initially (TDD) - no implementation exists yet
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 describe('POST /interrogation/stop', () => {
+  let originalInvoke: any;
+
+  beforeEach(() => {
+    originalInvoke = global.ipcRenderer.invoke;
+  });
+
+  afterEach(() => {
+    // Restore original mock to prevent test pollution
+    global.ipcRenderer.invoke = originalInvoke;
+  });
+
   describe('Request validation', () => {
     it('should accept valid request with sessionId', async () => {
       // First start a session
@@ -43,7 +54,7 @@ describe('POST /interrogation/stop', () => {
 
   describe('Session state validation', () => {
     it('should return 404 when session does not exist', async () => {
-      const nonExistentId = uuidv4();
+      const nonExistentId = randomUUID();
 
       await expect(
         global.ipcRenderer.invoke('interrogation:stop', {
