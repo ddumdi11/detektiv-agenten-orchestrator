@@ -4,6 +4,7 @@ export default {
   testEnvironment: 'node',
   preset: 'ts-jest',
   testMatch: ['**/tests/unit/**/*.test.ts'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   collectCoverageFrom: [
     'src/main/**/*.ts',
     'src/agents/**/*.ts',
