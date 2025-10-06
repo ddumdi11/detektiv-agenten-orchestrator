@@ -25,8 +25,8 @@ describe('WitnessAgent', () => {
         expect(typeof response).toBe('string');
         expect(response.length).toBeGreaterThan(0);
       },
-      30000
-    ); // 30 second timeout for LLM response
+      300000
+    ); // 5 minute timeout for local LLM response
 
     it('should throw error if API key is missing', () => {
       const { WitnessAgent } = require('../../../src/agents/WitnessAgent');
