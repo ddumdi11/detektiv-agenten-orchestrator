@@ -164,7 +164,8 @@ export class InterrogationOrchestrator {
   private createWitness(witnessModel: string): WitnessAgent {
     const apiKey = process.env.ANYTHINGLLM_API_KEY || '';
     const baseUrl = process.env.ANYTHINGLLM_BASE_URL || 'http://localhost:3001';
-    const workspaceSlug = process.env.WITNESS_WORKSPACE_SLUG || '';
+    // Use witnessModel parameter as workspace slug, fall back to env var
+    const workspaceSlug = witnessModel || process.env.WITNESS_WORKSPACE_SLUG || '';
 
     if (!apiKey || !workspaceSlug) {
       throw new Error('AnythingLLM credentials not configured');
