@@ -156,6 +156,55 @@ export const ipcHandlers = {
     };
   },
 
+  'sessions:load': async (event: IpcMainInvokeEvent, sessionId: any) => {
+    // Validate sessionId
+    if (!sessionId) {
+      throw new Error('sessionId is required');
+    }
+    if (typeof sessionId !== 'string' || !isValidUUID(sessionId)) {
+      throw new Error('sessionId is invalid UUID');
+    }
+
+    // Find session
+    const session = sessions.get(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    // Return complete session data
+    return session;
+  },
+
+  'sessions:list': async (event: IpcMainInvokeEvent) => {
+    // Filter sessions: only completed, failed, or limit-reached (not running)
+    const finishedSessions = Array.from(sessions.values())
+      .filter((s) => s.status !== 'running')
+      .sort((a, b) => {
+        // Sort by startTime descending (newest first)
+        return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
+      })
+      .map((session) => {
+        // Map to SessionListItem format
+        const listItem: any = {
+          id: session.id,
+          hypothesis: session.hypothesis.text,
+          startTime: session.startTime,
+          status: session.status,
+        };
+
+        // Include consistencyScore only for completed sessions
+        if (session.status === 'completed' && session.auditResult) {
+          listItem.consistencyScore = session.auditResult.consistencyScore;
+        }
+
+        return listItem;
+      });
+
+    return {
+      sessions: finishedSessions,
+    };
+  },
+
   'interrogation:stop': async (event: IpcMainInvokeEvent, args: any) => {
     // Validate request
     if (!args || typeof args !== 'object') {
