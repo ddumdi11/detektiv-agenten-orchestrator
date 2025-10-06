@@ -1,10 +1,16 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
+import { ipcHandlers } from './ipc-handlers';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
   app.quit();
 }
+
+// Register IPC handlers
+Object.entries(ipcHandlers).forEach(([channel, handler]) => {
+  ipcMain.handle(channel, handler);
+});
 
 const createWindow = () => {
   // Create the browser window.
