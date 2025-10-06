@@ -3,6 +3,8 @@
  * Uses LLM (OpenAI/Anthropic/Gemini) to intelligently extract information
  */
 
+import Anthropic from '@anthropic-ai/sdk';
+
 export type QuestioningStrategy =
   | 'breadth-first'    // Get overview of all aspects
   | 'depth-first'      // Deep dive into specific topic
@@ -28,10 +30,18 @@ export class DetectiveAgent {
   private config: DetectiveConfig;
   private conversationHistory: ConversationTurn[] = [];
   private currentStrategy: QuestioningStrategy;
+  private anthropic?: Anthropic;
 
   constructor(config: DetectiveConfig) {
     this.config = config;
     this.currentStrategy = config.initialStrategy || 'breadth-first';
+
+    // Initialize Anthropic client if using anthropic provider
+    if (config.provider === 'anthropic') {
+      this.anthropic = new Anthropic({
+        apiKey: config.apiKey,
+      });
+    }
   }
 
   /**
@@ -103,24 +113,49 @@ export class DetectiveAgent {
    * Generate initial question based on hypothesis and strategy
    */
   private async generateInitialQuestion(hypothesis: string): Promise<string> {
+    // If using depth-first and hypothesis is already a question, use it directly
+    if (this.currentStrategy === 'depth-first' && hypothesis.includes('?')) {
+      return hypothesis;
+    }
+
     const strategyPrompts = {
-      'breadth-first': `Given the topic "${hypothesis}", ask a broad question to get an overview of all main aspects.`,
-      'depth-first': `Given the topic "${hypothesis}", ask a specific question to dive deep into one aspect.`,
-      'contradiction': `Given the topic "${hypothesis}", ask a question where you expect specific factual information.`,
-      'timeline': `Given the topic "${hypothesis}", ask about the sequence or process of what happens.`,
+      'breadth-first': `Given the topic/question: "${hypothesis}"
+
+Ask a broad question to get an overview of all main aspects. Return ONLY the question in the same language as the topic, nothing else.`,
+      'depth-first': `Given the topic/question: "${hypothesis}"
+
+Ask a specific question to dive deep into one aspect. Return ONLY the question in the same language as the topic, nothing else.`,
+      'contradiction': `Given the topic/question: "${hypothesis}"
+
+Ask a question where you expect specific factual information that can be verified. Return ONLY the question in the same language as the topic, nothing else.`,
+      'timeline': `Given the topic/question: "${hypothesis}"
+
+Ask about the sequence, process, or timeline of what happens. Return ONLY the question in the same language as the topic, nothing else.`,
     };
 
-    const prompt = `${strategyPrompts[this.currentStrategy]}
+    if (this.anthropic) {
+      const message = await this.anthropic.messages.create({
+        model: this.config.model,
+        max_tokens: 200,
+        messages: [
+          {
+            role: 'user',
+            content: strategyPrompts[this.currentStrategy],
+          },
+        ],
+      });
 
-Return ONLY the question, nothing else.`;
+      const textContent = message.content.find((block) => block.type === 'text');
+      if (textContent && textContent.type === 'text') {
+        return textContent.text.trim();
+      }
+    }
 
-    // TODO: Call LLM API (OpenAI/Anthropic/Gemini)
-    // For now, use hypothesis directly or adapt based on strategy
+    // Fallback if LLM not available
     switch (this.currentStrategy) {
       case 'breadth-first':
         return `What are the main aspects of this topic?`;
       case 'depth-first':
-        // Use hypothesis directly if it's already a question
         return hypothesis;
       case 'contradiction':
         return `What specific facts are mentioned about this?`;
@@ -139,10 +174,82 @@ Return ONLY the question, nothing else.`;
     findings: string[];
     curiosityTriggers: string[];
   }> {
-    // TODO: Use LLM to extract key facts and identify interesting follow-ups
-    // For now, simple keyword detection
+    if (this.anthropic) {
+      const analysisPrompt = `You are a detective analyzing a witness's answer. Extract key facts and identify interesting topics for follow-up questions.
+
+Question asked: "${question}"
+Witness answer: "${answer}"
+
+Analyze this answer and provide:
+1. Key findings: Concrete facts, statements, or claims made by the witness (list each as a bullet point)
+2. Curiosity triggers: Interesting topics, gaps, or ambiguities that warrant follow-up questions (list each as a bullet point)
+
+Format your response as:
+FINDINGS:
+- [fact 1]
+- [fact 2]
+...
+
+CURIOSITY:
+- [topic 1]
+- [topic 2]
+...
+
+If the witness says information is not in the document or refuses to answer, note this as a finding.`;
+
+      const message = await this.anthropic.messages.create({
+        model: this.config.model,
+        max_tokens: 1000,
+        messages: [
+          {
+            role: 'user',
+            content: analysisPrompt,
+          },
+        ],
+      });
+
+      const textContent = message.content.find((block) => block.type === 'text');
+      if (textContent && textContent.type === 'text') {
+        const analysisText = textContent.text;
+
+        // Parse findings and curiosity triggers
+        const findings: string[] = [];
+        const curiosityTriggers: string[] = [];
+
+        const findingsMatch = analysisText.match(/FINDINGS:\s*([\s\S]*?)(?=CURIOSITY:|$)/i);
+        if (findingsMatch) {
+          const findingsText = findingsMatch[1];
+          const findingLines = findingsText
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.startsWith('-'))
+            .map((line) => line.substring(1).trim());
+          findings.push(...findingLines);
+        }
+
+        const curiosityMatch = analysisText.match(/CURIOSITY:\s*([\s\S]*?)$/i);
+        if (curiosityMatch) {
+          const curiosityText = curiosityMatch[1];
+          const curiosityLines = curiosityText
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.startsWith('-'))
+            .map((line) => line.substring(1).trim());
+          curiosityTriggers.push(...curiosityLines);
+        }
+
+        return { findings, curiosityTriggers };
+      }
+    }
+
+    // Fallback: simple keyword detection
     const findings: string[] = [];
     const curiosityTriggers: string[] = [];
+
+    if (answer.toLowerCase().includes('not in the document') || answer.toLowerCase().includes('nicht im dokument')) {
+      findings.push('Witness states information is not in the document');
+      curiosityTriggers.push('Try rephrasing or asking about related topics');
+    }
 
     // Extract key phrases (simplified)
     if (answer.toLowerCase().includes('nährstoff')) {

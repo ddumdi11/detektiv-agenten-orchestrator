@@ -3,8 +3,12 @@
  * Tests the full interrogation flow with real AnythingLLM
  */
 
+import * as dotenv from 'dotenv';
 import { DetectiveAgent } from '../../src/agents/DetectiveAgent';
 import { WitnessAgent } from '../../src/agents/WitnessAgent';
+
+// Load environment variables
+dotenv.config();
 
 describe('Detective-Witness Interrogation', () => {
   it(
@@ -12,16 +16,16 @@ describe('Detective-Witness Interrogation', () => {
     async () => {
       // Setup Witness (AnythingLLM with optimized settings)
       const witness = new WitnessAgent({
-        apiKey: 'YX8K6D2-C8X4BZ6-JMXX9PG-2RXC8PB',
-        baseUrl: 'http://localhost:3001',
-        workspaceSlug: 'mynearlydryottobretrial',
+        apiKey: process.env.ANYTHINGLLM_API_KEY || 'YX8K6D2-C8X4BZ6-JMXX9PG-2RXC8PB',
+        baseUrl: process.env.ANYTHINGLLM_BASE_URL || 'http://localhost:3001',
+        workspaceSlug: process.env.WITNESS_WORKSPACE_SLUG || 'mynearlydryottobretrial',
       });
 
-      // Setup Detective (using simple logic for now, will add LLM later)
+      // Setup Detective with Anthropic Claude
       const detective = new DetectiveAgent({
-        provider: 'openai', // TODO: Will be used when we add LLM integration
-        apiKey: 'placeholder',
-        model: 'gpt-4o',
+        provider: 'anthropic',
+        apiKey: process.env.ANTHROPIC_API_KEY || '',
+        model: 'claude-3-5-sonnet-20241022',
         initialStrategy: 'depth-first',
       });
 
