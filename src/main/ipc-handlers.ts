@@ -50,6 +50,12 @@ const sessions = new Map<string, InterrogationSession>();
 // Export for testing - allows tests to clear state between runs
 export const clearSessions = () => sessions.clear();
 
+// Helper: Validate UUID format
+const isValidUUID = (uuid: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+};
+
 export const ipcHandlers = {
   'interrogation:start': async (event: IpcMainInvokeEvent, args: any) => {
     // Validate request
@@ -124,6 +130,43 @@ export const ipcHandlers = {
     return {
       sessionId,
       status: 'running',
+    };
+  },
+
+  'interrogation:stop': async (event: IpcMainInvokeEvent, args: any) => {
+    // Validate request
+    if (!args || typeof args !== 'object') {
+      throw new Error('Request body is required');
+    }
+
+    const { sessionId } = args;
+
+    // Validate sessionId
+    if (!sessionId) {
+      throw new Error('sessionId is required');
+    }
+    if (typeof sessionId !== 'string' || !isValidUUID(sessionId)) {
+      throw new Error('sessionId is invalid UUID');
+    }
+
+    // Find session
+    const session = sessions.get(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    // Check if session is running
+    if (session.status !== 'running') {
+      throw new Error('Session is not running');
+    }
+
+    // Update session status
+    session.status = 'failed';
+    session.endTime = new Date().toISOString();
+
+    return {
+      status: 'failed',
+      partialResults: session,
     };
   },
 };
