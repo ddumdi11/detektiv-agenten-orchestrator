@@ -15,10 +15,16 @@ describe('Detective-Witness Interrogation (OpenAI)', () => {
     'should extract information about alcohol and nutrients using OpenAI',
     async () => {
       // Setup Witness (AnythingLLM with optimized settings)
+      // Require real credentials for AnythingLLM; skip test if not provided
+      if (!process.env.ANYTHINGLLM_API_KEY || !process.env.WITNESS_WORKSPACE_SLUG) {
+        console.log('Skipping test: ANYTHINGLLM_API_KEY and WITNESS_WORKSPACE_SLUG required');
+        return;
+      }
+
       const witness = new WitnessAgent({
-        apiKey: process.env.ANYTHINGLLM_API_KEY || 'YX8K6D2-C8X4BZ6-JMXX9PG-2RXC8PB',
+        apiKey: process.env.ANYTHINGLLM_API_KEY,
         baseUrl: process.env.ANYTHINGLLM_BASE_URL || 'http://localhost:3001',
-        workspaceSlug: process.env.WITNESS_WORKSPACE_SLUG || 'mynearlydryottobretrial',
+        workspaceSlug: process.env.WITNESS_WORKSPACE_SLUG,
       });
 
       // Setup Detective with OpenAI GPT-4o-mini
