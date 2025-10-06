@@ -3,8 +3,9 @@
  * These handlers process requests from the renderer process
  */
 
-import { IpcMainInvokeEvent } from 'electron';
+import { IpcMainInvokeEvent, BrowserWindow } from 'electron';
 import { randomUUID } from 'crypto';
+import { InterrogationOrchestrator } from './InterrogationOrchestrator';
 
 // In-memory session store (temporary - will be replaced with proper storage)
 interface InterrogationSession {
@@ -49,6 +50,14 @@ const sessions = new Map<string, InterrogationSession>();
 
 // Export for testing - allows tests to clear state between runs
 export const clearSessions = () => sessions.clear();
+
+// Global orchestrator instance (will be initialized when window is created)
+let orchestrator: InterrogationOrchestrator | null = null;
+
+// Initialize orchestrator with main window
+export const initializeOrchestrator = (mainWindow: BrowserWindow) => {
+  orchestrator = new InterrogationOrchestrator(mainWindow);
+};
 
 // Helper: Validate UUID format
 const isValidUUID = (uuid: string): boolean => {
@@ -107,6 +116,11 @@ export const ipcHandlers = {
       throw new Error('Another interrogation session is already running');
     }
 
+    // Ensure orchestrator is ready before creating session (prevents phantom sessions)
+    if (!orchestrator) {
+      throw new Error('Orchestrator not initialized - main window may not be ready');
+    }
+
     // Create new session
     const sessionId = randomUUID();
     const session: InterrogationSession = {
@@ -126,6 +140,50 @@ export const ipcHandlers = {
     };
 
     sessions.set(sessionId, session);
+
+    orchestrator.startInterrogation({
+        hypothesis,
+        detectiveProvider,
+        witnessModel,
+        iterationLimit,
+        sessionId,
+      })
+        .then((result) => {
+          // Update session on successful completion
+          const completedSession = sessions.get(sessionId);
+          if (!completedSession) {
+            // Race condition: session was deleted or never created
+            console.warn('[Orchestrator] Completion handler: session not found', {
+              sessionId,
+              reason: 'Session missing after orchestration completed',
+            });
+            return;
+          }
+
+          completedSession.status = 'completed';
+          completedSession.endTime = new Date().toISOString();
+
+          // TODO: Update InterrogationOrchestrator.startInterrogation() to return
+          // { actualIterationCount: number } so we can use the real count instead
+          // of assuming iterationLimit. For now, fall back to iterationLimit.
+          completedSession.currentIteration = iterationLimit;
+
+          // Note: auditTrail is for exceptional events only (provider_switch, timeout, error)
+          // Normal completion doesn't need an audit entry
+        })
+        .catch((error) => {
+          // Update session on error
+          const failedSession = sessions.get(sessionId);
+          if (failedSession) {
+            failedSession.status = 'failed';
+            failedSession.endTime = new Date().toISOString();
+            failedSession.auditTrail.push({
+              timestamp: new Date().toISOString(),
+              event: 'error',
+              reason: error.message || 'Unknown error',
+            });
+          }
+        });
 
     return {
       sessionId,
@@ -285,6 +343,11 @@ export const ipcHandlers = {
     // Check if session is running
     if (session.status !== 'running') {
       throw new Error('Session is not running');
+    }
+
+    // Stop orchestrator if running
+    if (orchestrator) {
+      orchestrator.stopInterrogation(sessionId);
     }
 
     // Update session status
