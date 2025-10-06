@@ -148,16 +148,28 @@ export const ipcHandlers = {
         iterationLimit,
         sessionId,
       })
-        .then(() => {
+        .then((result) => {
           // Update session on successful completion
           const completedSession = sessions.get(sessionId);
-          if (completedSession) {
-            completedSession.status = 'completed';
-            completedSession.endTime = new Date().toISOString();
-            completedSession.currentIteration = iterationLimit;
-            // Note: auditTrail is for exceptional events only (provider_switch, timeout, error)
-            // Normal completion doesn't need an audit entry
+          if (!completedSession) {
+            // Race condition: session was deleted or never created
+            console.warn('[Orchestrator] Completion handler: session not found', {
+              sessionId,
+              reason: 'Session missing after orchestration completed',
+            });
+            return;
           }
+
+          completedSession.status = 'completed';
+          completedSession.endTime = new Date().toISOString();
+
+          // TODO: Update InterrogationOrchestrator.startInterrogation() to return
+          // { actualIterationCount: number } so we can use the real count instead
+          // of assuming iterationLimit. For now, fall back to iterationLimit.
+          completedSession.currentIteration = iterationLimit;
+
+          // Note: auditTrail is for exceptional events only (provider_switch, timeout, error)
+          // Normal completion doesn't need an audit entry
         })
         .catch((error) => {
           // Update session on error
