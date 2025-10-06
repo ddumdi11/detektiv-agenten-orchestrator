@@ -5,24 +5,28 @@
 
 describe('WitnessAgent', () => {
   describe('Basic functionality', () => {
-    it('should answer a simple question', async () => {
-      // Arrange
-      const { WitnessAgent } = await import('../../../src/agents/WitnessAgent');
+    it(
+      'should answer a simple question',
+      async () => {
+        // Arrange
+        const { WitnessAgent } = await import('../../../src/agents/WitnessAgent');
 
-      const agent = new WitnessAgent({
-        apiKey: 'YX8K6D2-C8X4BZ6-JMXX9PG-2RXC8PB',
-        baseUrl: 'http://localhost:3001',
-        workspaceSlug: 'mynearlydryottobretrial',
-      });
+        const agent = new WitnessAgent({
+          apiKey: 'YX8K6D2-C8X4BZ6-JMXX9PG-2RXC8PB',
+          baseUrl: 'http://localhost:3001',
+          workspaceSlug: 'mynearlydryottobretrial',
+        });
 
-      // Act
-      const response = await agent.ask('What is this document about?');
+        // Act
+        const response = await agent.ask('What is this document about?');
 
-      // Assert
-      expect(response).toBeDefined();
-      expect(typeof response).toBe('string');
-      expect(response.length).toBeGreaterThan(0);
-    });
+        // Assert
+        expect(response).toBeDefined();
+        expect(typeof response).toBe('string');
+        expect(response.length).toBeGreaterThan(0);
+      },
+      30000
+    ); // 30 second timeout for LLM response
 
     it('should throw error if API key is missing', () => {
       const { WitnessAgent } = require('../../../src/agents/WitnessAgent');
