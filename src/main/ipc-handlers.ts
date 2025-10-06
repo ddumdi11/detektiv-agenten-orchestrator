@@ -211,7 +211,7 @@ export const ipcHandlers = {
       throw new Error('Request body is required');
     }
 
-    const { provider, apiKey, model, isDefault } = args;
+    const { provider, apiKey, model } = args;
 
     // Validate provider
     const validProviders = ['openai', 'anthropic', 'gemini'];
@@ -221,30 +221,6 @@ export const ipcHandlers = {
     if (!validProviders.includes(provider)) {
       throw new Error('provider is invalid');
     }
-
-    // Validate apiKey
-    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim() === '') {
-      throw new Error('apiKey is required');
-    }
-    if (apiKey.length < 20) {
-      throw new Error('apiKey must be at least 20 characters');
-    }
-
-    // Validate model
-    if (!model || typeof model !== 'string') {
-      throw new Error('model is required');
-    }
-
-    // TODO: Implement actual credential validation (API call)
-    // For MVP, accept any key >= 20 chars
-    // In production, validate with actual API call
-
-    // TODO: Implement actual credential encryption and storage
-    // For now, return success
-    return {
-      status: 'success',
-    };
-  },
 
   'config:getDefaultDetective': async (event: IpcMainInvokeEvent) => {
     // TODO: Implement actual default provider retrieval from config
