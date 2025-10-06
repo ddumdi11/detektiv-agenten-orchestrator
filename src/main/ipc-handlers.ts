@@ -305,6 +305,11 @@ export const ipcHandlers = {
     return null;
   },
 
+  'config:getDefaultWitness': async (event: IpcMainInvokeEvent) => {
+    // Return default witness workspace slug from environment
+    return process.env.WITNESS_WORKSPACE_SLUG || '';
+  },
+
   'config:getRaw': async (event: IpcMainInvokeEvent) => {
     // TODO: Implement actual config file reading
     // For now, return mock encrypted config

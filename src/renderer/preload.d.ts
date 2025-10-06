@@ -36,6 +36,7 @@ export interface ElectronAPI {
     }) => Promise<{ status: string }>;
 
     getDefaultDetective: () => Promise<string | null>;
+    getDefaultWitness: () => Promise<string>;
     getRaw: () => Promise<string>;
   };
 }

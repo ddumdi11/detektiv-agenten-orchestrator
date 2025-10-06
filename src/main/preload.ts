@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     getDefaultDetective: () => ipcRenderer.invoke('config:getDefaultDetective'),
 
+    getDefaultWitness: () => ipcRenderer.invoke('config:getDefaultWitness'),
+
     getRaw: () => ipcRenderer.invoke('config:getRaw'),
   },
 });
