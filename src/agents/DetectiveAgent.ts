@@ -4,6 +4,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 
 export type QuestioningStrategy =
   | 'breadth-first'    // Get overview of all aspects
@@ -31,14 +32,19 @@ export class DetectiveAgent {
   private conversationHistory: ConversationTurn[] = [];
   private currentStrategy: QuestioningStrategy;
   private anthropic?: Anthropic;
+  private openai?: OpenAI;
 
   constructor(config: DetectiveConfig) {
     this.config = config;
     this.currentStrategy = config.initialStrategy || 'breadth-first';
 
-    // Initialize Anthropic client if using anthropic provider
+    // Initialize LLM client based on provider
     if (config.provider === 'anthropic') {
       this.anthropic = new Anthropic({
+        apiKey: config.apiKey,
+      });
+    } else if (config.provider === 'openai') {
+      this.openai = new OpenAI({
         apiKey: config.apiKey,
       });
     }
@@ -133,6 +139,7 @@ Ask a question where you expect specific factual information that can be verifie
 Ask about the sequence, process, or timeline of what happens. Return ONLY the question in the same language as the topic, nothing else.`,
     };
 
+    // Call LLM based on provider
     if (this.anthropic) {
       const message = await this.anthropic.messages.create({
         model: this.config.model,
@@ -148,6 +155,22 @@ Ask about the sequence, process, or timeline of what happens. Return ONLY the qu
       const textContent = message.content.find((block) => block.type === 'text');
       if (textContent && textContent.type === 'text') {
         return textContent.text.trim();
+      }
+    } else if (this.openai) {
+      const response = await this.openai.chat.completions.create({
+        model: this.config.model,
+        max_tokens: 200,
+        messages: [
+          {
+            role: 'user',
+            content: strategyPrompts[this.currentStrategy],
+          },
+        ],
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (content) {
+        return content.trim();
       }
     }
 
@@ -174,8 +197,7 @@ Ask about the sequence, process, or timeline of what happens. Return ONLY the qu
     findings: string[];
     curiosityTriggers: string[];
   }> {
-    if (this.anthropic) {
-      const analysisPrompt = `You are a detective analyzing a witness's answer. Extract key facts and identify interesting topics for follow-up questions.
+    const analysisPrompt = `You are a detective analyzing a witness's answer. Extract key facts and identify interesting topics for follow-up questions.
 
 Question asked: "${question}"
 Witness answer: "${answer}"
@@ -197,6 +219,8 @@ CURIOSITY:
 
 If the witness says information is not in the document or refuses to answer, note this as a finding.`;
 
+    // Call LLM based on provider
+    if (this.anthropic) {
       const message = await this.anthropic.messages.create({
         model: this.config.model,
         max_tokens: 1000,
@@ -210,35 +234,23 @@ If the witness says information is not in the document or refuses to answer, not
 
       const textContent = message.content.find((block) => block.type === 'text');
       if (textContent && textContent.type === 'text') {
-        const analysisText = textContent.text;
+        return this.parseAnalysisResponse(textContent.text);
+      }
+    } else if (this.openai) {
+      const response = await this.openai.chat.completions.create({
+        model: this.config.model,
+        max_tokens: 1000,
+        messages: [
+          {
+            role: 'user',
+            content: analysisPrompt,
+          },
+        ],
+      });
 
-        // Parse findings and curiosity triggers
-        const findings: string[] = [];
-        const curiosityTriggers: string[] = [];
-
-        const findingsMatch = analysisText.match(/FINDINGS:\s*([\s\S]*?)(?=CURIOSITY:|$)/i);
-        if (findingsMatch) {
-          const findingsText = findingsMatch[1];
-          const findingLines = findingsText
-            .split('\n')
-            .map((line) => line.trim())
-            .filter((line) => line.startsWith('-'))
-            .map((line) => line.substring(1).trim());
-          findings.push(...findingLines);
-        }
-
-        const curiosityMatch = analysisText.match(/CURIOSITY:\s*([\s\S]*?)$/i);
-        if (curiosityMatch) {
-          const curiosityText = curiosityMatch[1];
-          const curiosityLines = curiosityText
-            .split('\n')
-            .map((line) => line.trim())
-            .filter((line) => line.startsWith('-'))
-            .map((line) => line.substring(1).trim());
-          curiosityTriggers.push(...curiosityLines);
-        }
-
-        return { findings, curiosityTriggers };
+      const content = response.choices[0]?.message?.content;
+      if (content) {
+        return this.parseAnalysisResponse(content);
       }
     }
 
@@ -269,7 +281,43 @@ If the witness says information is not in the document or refuses to answer, not
   }
 
   /**
+   * Parse LLM analysis response into findings and curiosity triggers
+   */
+  private parseAnalysisResponse(analysisText: string): {
+    findings: string[];
+    curiosityTriggers: string[];
+  } {
+    const findings: string[] = [];
+    const curiosityTriggers: string[] = [];
+
+    const findingsMatch = analysisText.match(/FINDINGS:\s*([\s\S]*?)(?=CURIOSITY:|$)/i);
+    if (findingsMatch) {
+      const findingsText = findingsMatch[1];
+      const findingLines = findingsText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith('-'))
+        .map((line) => line.substring(1).trim());
+      findings.push(...findingLines);
+    }
+
+    const curiosityMatch = analysisText.match(/CURIOSITY:\s*([\s\S]*?)$/i);
+    if (curiosityMatch) {
+      const curiosityText = curiosityMatch[1];
+      const curiosityLines = curiosityText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith('-'))
+        .map((line) => line.substring(1).trim());
+      curiosityTriggers.push(...curiosityLines);
+    }
+
+    return { findings, curiosityTriggers };
+  }
+
+  /**
    * Decide next move: continue, switch strategy, or stop
+   * Detects when stuck (repeated "not in document") and switches strategy
    */
   private async decideNextMove(analysis: {
     findings: string[];
@@ -279,6 +327,18 @@ If the witness says information is not in the document or refuses to answer, not
     newStrategy?: QuestioningStrategy;
     nextQuestion: string;
   }> {
+    // Check if we're stuck (last 2 answers were "not in document")
+    const isStuck = this.conversationHistory.length >= 2 &&
+      this.conversationHistory.slice(-2).every(turn =>
+        turn.answer.toLowerCase().includes('not in the document') ||
+        turn.answer.toLowerCase().includes('nicht im dokument')
+      );
+
+    if (isStuck) {
+      console.log('[Strategy Switch] Detected stuck pattern - switching strategy');
+      return this.switchToNextStrategy();
+    }
+
     // If we have curiosity triggers, follow up
     if (analysis.curiosityTriggers.length > 0) {
       return {
@@ -288,6 +348,17 @@ If the witness says information is not in the document or refuses to answer, not
     }
 
     // No more curiosity - switch strategy or stop
+    return this.switchToNextStrategy();
+  }
+
+  /**
+   * Switch to the next questioning strategy in the cycle
+   */
+  private switchToNextStrategy(): {
+    shouldStop: boolean;
+    newStrategy?: QuestioningStrategy;
+    nextQuestion: string;
+  } {
     const strategyCycle: QuestioningStrategy[] = [
       'breadth-first',
       'depth-first',

@@ -14,7 +14,10 @@ This directory contains the core interrogation agents for the Detektiv-Agenten-O
 
 ### Detective Agent (`DetectiveAgent.ts`)
 - **Purpose**: Intelligently interrogates Witness to extract information
-- **Technology**: Anthropic Claude (claude-3-5-sonnet-20241022)
+- **Technology**: Multi-provider support
+  - Anthropic Claude Sonnet 4 (claude-sonnet-4-20250514)
+  - OpenAI GPT-4o-mini (gpt-4o-mini)
+  - Gemini (coming soon)
 - **Features**:
   - **4 Questioning Strategies** (like chess openings):
     1. `breadth-first`: Overview of all aspects
@@ -23,7 +26,10 @@ This directory contains the core interrogation agents for the Detektiv-Agenten-O
     4. `timeline`: Extract chronological sequences
   - **Conversation Memory**: Tracks full Q&A history with metadata
   - **Curiosity-Driven Follow-ups**: Automatically identifies interesting topics
-  - **Strategy Switching**: Adaptively changes approach based on progress
+  - **Adaptive Strategy Switching**:
+    - Detects when stuck (repeated "not in document" responses)
+    - Automatically switches to next strategy
+    - Cycles through all 4 strategies for comprehensive interrogation
 
 ## Workflow
 
