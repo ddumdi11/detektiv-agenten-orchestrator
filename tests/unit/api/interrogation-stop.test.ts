@@ -3,6 +3,8 @@
  * This test MUST FAIL initially (TDD) - no implementation exists yet
  */
 
+import { v4 as uuidv4 } from 'uuid';
+
 describe('POST /interrogation/stop', () => {
   describe('Request validation', () => {
     it('should accept valid request with sessionId', async () => {
@@ -41,7 +43,7 @@ describe('POST /interrogation/stop', () => {
 
   describe('Session state validation', () => {
     it('should return 404 when session does not exist', async () => {
-      const nonExistentId = '00000000-0000-4000-8000-000000000000';
+      const nonExistentId = uuidv4();
 
       await expect(
         global.ipcRenderer.invoke('interrogation:stop', {

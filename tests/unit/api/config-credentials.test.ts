@@ -100,10 +100,8 @@ describe('PUT /config/credentials', () => {
         model: 'gpt-4o',
       });
 
-      // Read raw config file to verify encryption
-      const configPath = await global.ipcRenderer.invoke('config:getPath');
-      const fs = require('fs');
-      const rawConfig = fs.readFileSync(configPath, 'utf8');
+      // Use IPC to get raw config instead of direct filesystem access
+      const rawConfig = await global.ipcRenderer.invoke('config:getRaw');
 
       // API key should NOT appear in plain text
       expect(rawConfig).not.toContain(testKey);

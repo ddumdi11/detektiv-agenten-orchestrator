@@ -3,6 +3,8 @@
  * This test MUST FAIL initially (TDD) - no implementation exists yet
  */
 
+import { v4 as uuidv4 } from 'uuid';
+
 interface QAPair {
   sequence: number;
   question: string;
@@ -14,6 +16,17 @@ interface QAPair {
 describe('GET /interrogation/status/:sessionId', () => {
   // Store original mock to restore after each test
   let originalInvoke: any;
+
+  // Helper function to reduce duplication
+  const startTestSession = async (overrides = {}) => {
+    return await global.ipcRenderer.invoke('interrogation:start', {
+      hypothesis: 'Test question',
+      iterationLimit: 10,
+      detectiveProvider: 'openai',
+      witnessModel: 'llama2',
+      ...overrides,
+    });
+  };
 
   beforeEach(() => {
     originalInvoke = global.ipcRenderer.invoke;
@@ -27,12 +40,7 @@ describe('GET /interrogation/status/:sessionId', () => {
   describe('Request validation', () => {
     it('should accept valid sessionId', async () => {
       // Start a session first
-      const startResponse = await global.ipcRenderer.invoke('interrogation:start', {
-        hypothesis: 'Test question',
-        iterationLimit: 10,
-        detectiveProvider: 'openai',
-        witnessModel: 'llama2',
-      });
+      const startResponse = await startTestSession();
 
       const statusResponse = await global.ipcRenderer.invoke(
         'interrogation:status',
@@ -52,7 +60,7 @@ describe('GET /interrogation/status/:sessionId', () => {
     });
 
     it('should return 404 for non-existent session', async () => {
-      const nonExistentId = '00000000-0000-4000-8000-000000000000';
+      const nonExistentId = uuidv4();
 
       await expect(
         global.ipcRenderer.invoke('interrogation:status', nonExistentId)

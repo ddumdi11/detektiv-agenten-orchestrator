@@ -3,6 +3,8 @@
  * This test MUST FAIL initially (TDD) - no implementation exists yet
  */
 
+import { v4 as uuidv4 } from 'uuid';
+
 describe('GET /sessions/:sessionId', () => {
   describe('Request validation', () => {
     it('should accept valid UUID sessionId', async () => {
@@ -35,7 +37,7 @@ describe('GET /sessions/:sessionId', () => {
     });
 
     it('should return 404 for non-existent session', async () => {
-      const nonExistentId = '00000000-0000-4000-8000-000000000000';
+      const nonExistentId = uuidv4();
 
       await expect(global.ipcRenderer.invoke('sessions:load', nonExistentId)).rejects.toThrow(
         /session.*not found/i
