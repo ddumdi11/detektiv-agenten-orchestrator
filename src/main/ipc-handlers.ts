@@ -222,6 +222,25 @@ export const ipcHandlers = {
       throw new Error('provider is invalid');
     }
 
+    // Validate apiKey
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim() === '') {
+      throw new Error('apiKey is required');
+    }
+    if (apiKey.length < 20) {
+      throw new Error('apiKey must have minLength 20 characters');
+    }
+
+    // Validate model
+    if (!model || typeof model !== 'string') {
+      throw new Error('model is required');
+    }
+
+    // TODO: Implement actual credential encryption and storage
+    return {
+      status: 'success',
+    };
+  },
+
   'config:getDefaultDetective': async (event: IpcMainInvokeEvent) => {
     // TODO: Implement actual default provider retrieval from config
     // For now, return null (no default set)
