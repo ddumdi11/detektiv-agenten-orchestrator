@@ -25,7 +25,7 @@ describe('Detective-Witness Interrogation', () => {
       const detective = new DetectiveAgent({
         provider: 'anthropic',
         apiKey: process.env.ANTHROPIC_API_KEY || '',
-        model: 'claude-3-5-sonnet-20241022',
+        model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
         initialStrategy: 'depth-first',
       });
 
@@ -52,6 +52,6 @@ describe('Detective-Witness Interrogation', () => {
         console.log(`    Findings: ${turn.findings.join(', ')}`);
       });
     },
-    300000 // 5 minute timeout (multiple LLM calls)
+    600000 // 10 minute timeout (multiple LLM calls with Claude Sonnet 4)
   );
 });
