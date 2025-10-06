@@ -102,41 +102,12 @@ describe('GET /sessions', () => {
       ];
 
       global.ipcRenderer.invoke = jest.fn((channel: string) => {
-        if (channel === 'interrogation:start') {
-          return Promise.resolve({ sessionId: 'test-session-id' });
-        }
-        if (channel === 'interrogation:stop') {
-          return Promise.resolve({ status: 'success' });
-        }
         if (channel === 'sessions:list') {
           return Promise.resolve({ sessions: mockSessions });
         }
         return Promise.reject(new Error(`Unhandled channel: ${channel}`));
       });
 
-      const session1 = await global.ipcRenderer.invoke('interrogation:start', {
-        hypothesis: 'First question',
-        iterationLimit: 5,
-        detectiveProvider: 'openai',
-        witnessModel: 'llama2',
-      });
-
-      await global.ipcRenderer.invoke('interrogation:stop', {
-        sessionId: session1.sessionId,
-      });
-
-      const session2 = await global.ipcRenderer.invoke('interrogation:start', {
-        hypothesis: 'Second question',
-        iterationLimit: 5,
-        detectiveProvider: 'openai',
-        witnessModel: 'llama2',
-      });
-
-      await global.ipcRenderer.invoke('interrogation:stop', {
-        sessionId: session2.sessionId,
-      });
-
-      // List sessions
       const listResponse = await global.ipcRenderer.invoke('sessions:list');
 
       // Verify ordering (newest first)
