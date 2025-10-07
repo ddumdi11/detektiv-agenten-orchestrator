@@ -6,6 +6,13 @@
 import { IpcMainInvokeEvent, BrowserWindow } from 'electron';
 import { randomUUID } from 'crypto';
 import { InterrogationOrchestrator } from './InterrogationOrchestrator';
+import { DocumentLoader } from '../services/DocumentLoader';
+import { TextSplitter } from '../services/TextSplitter';
+import { EmbeddingService } from '../services/EmbeddingService';
+import { VectorStoreManager } from '../services/VectorStoreManager';
+import type { DocumentSource } from '../renderer/preload';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // In-memory session store (temporary - will be replaced with proper storage)
 interface InterrogationSession {
@@ -53,9 +60,80 @@ interface InterrogationSession {
 }
 
 const sessions = new Map<string, InterrogationSession>();
+const documents = new Map<string, DocumentSource>();
 
 // Export for testing - allows tests to clear state between runs
 export const clearSessions = () => sessions.clear();
+export const clearDocuments = () => documents.clear();
+
+// Background document processing function
+async function processDocument(documentId: string) {
+  const document = documents.get(documentId);
+  if (!document) return;
+
+  try {
+    console.log(`[DocumentProcessor] Starting processing for document: ${document.filename}`);
+
+    // Update status to processing
+    document.embeddingStatus = 'processing';
+    document.embeddingProgress = 10;
+
+    // Initialize services with default settings
+    const documentLoader = new DocumentLoader();
+    const textSplitter = new TextSplitter({ chunkSize: 1000, chunkOverlap: 200 });
+    const embeddingService = new EmbeddingService({
+      baseUrl: 'http://localhost:11434',
+      model: 'nomic-embed-text',
+      batchSize: 10,
+    });
+
+    // Create embeddings instance for vector store
+    const { OllamaEmbeddings } = await import('@langchain/community/embeddings/ollama');
+    const embeddings = new OllamaEmbeddings({
+      model: 'nomic-embed-text',
+      baseUrl: 'http://localhost:11434',
+    });
+
+    const vectorStoreManager = new VectorStoreManager(embeddings, {
+      url: 'http://localhost:8000',
+      collectionName: document.vectorStoreCollectionId,
+    });
+
+    // Step 1: Load document
+    document.embeddingProgress = 20;
+    console.log(`[DocumentProcessor] Loading document: ${document.filePath}`);
+    const docs = await documentLoader.loadDocument(document.filePath);
+
+    // Step 2: Split into chunks
+    document.embeddingProgress = 40;
+    console.log(`[DocumentProcessor] Splitting into chunks`);
+    const chunks = await textSplitter.splitDocuments(docs);
+    document.chunkCount = chunks.length;
+
+    // Calculate total tokens (rough estimate)
+    document.totalTokens = chunks.reduce((sum, chunk) => sum + chunk.pageContent.length, 0);
+
+    // Step 3: Initialize vector store
+    document.embeddingProgress = 60;
+    console.log(`[DocumentProcessor] Initializing vector store`);
+    await vectorStoreManager.initialize();
+
+    // Step 4: Store in vector database
+    document.embeddingProgress = 80;
+    console.log(`[DocumentProcessor] Storing ${chunks.length} chunks in vector store`);
+    await vectorStoreManager.addDocuments(chunks);
+
+    // Complete
+    document.embeddingProgress = 100;
+    document.embeddingStatus = 'completed';
+
+    console.log(`[DocumentProcessor] Document processing completed: ${document.filename}`);
+  } catch (error) {
+    console.error(`[DocumentProcessor] Processing failed for ${document.filename}:`, error);
+    document.embeddingStatus = 'failed';
+    document.embeddingError = error instanceof Error ? error.message : 'Unknown error';
+  }
+}
 
 // Global orchestrator instance (will be initialized when window is created)
 let orchestrator: InterrogationOrchestrator | null = null;
@@ -409,5 +487,144 @@ export const ipcHandlers = {
       status: 'failed',
       partialResults: session,
     };
+  },
+
+  'documents:upload': async (event: IpcMainInvokeEvent, fileData: any) => {
+    console.log('[IPC] Starting document upload:', fileData.name);
+
+    // Validate file data
+    if (!fileData || !fileData.data) {
+      throw new Error('File data is required');
+    }
+
+    // Create temporary file path (in a real app, this would be in a proper documents folder)
+    const tempDir = path.join(process.cwd(), 'temp-documents');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const filePath = path.join(tempDir, `${randomUUID()}-${fileData.name}`);
+
+    // Save file to disk
+    const buffer = Buffer.from(fileData.data);
+    fs.writeFileSync(filePath, buffer);
+
+    // Determine file type from MIME type or extension
+    let fileType: 'pdf' | 'txt' | 'docx' = 'txt';
+    if (fileData.type.includes('pdf')) {
+      fileType = 'pdf';
+    } else if (fileData.type.includes('docx') || fileData.name.toLowerCase().endsWith('.docx')) {
+      fileType = 'docx';
+    }
+
+    // Create document record
+    const documentId = randomUUID();
+    const document: DocumentSource = {
+      id: documentId,
+      workspaceId: 'default-workspace', // In a real app, this would be configurable
+      filePath,
+      filename: fileData.name,
+      fileType,
+      fileSizeBytes: fileData.size,
+      uploadTimestamp: new Date().toISOString(),
+      embeddingStatus: 'pending',
+      embeddingProgress: 0,
+      chunkCount: 0,
+      totalTokens: 0,
+      vectorStoreCollectionId: `doc-${documentId}`,
+    };
+
+    documents.set(documentId, document);
+
+    // Start background processing
+    processDocument(documentId);
+
+    console.log('[IPC] Document uploaded:', documentId);
+    return document;
+  },
+
+  'documents:list': async (event: IpcMainInvokeEvent) => {
+    return { documents: Array.from(documents.values()) };
+  },
+
+  'documents:delete': async (event: IpcMainInvokeEvent, documentId: string) => {
+    if (!documentId) {
+      throw new Error('documentId is required');
+    }
+
+    const document = documents.get(documentId);
+    if (!document) {
+      throw new Error('Document not found');
+    }
+
+    // Delete file from disk
+    try {
+      if (fs.existsSync(document.filePath)) {
+        fs.unlinkSync(document.filePath);
+      }
+    } catch (error) {
+      console.warn('[IPC] Failed to delete file:', error);
+    }
+
+    // Remove from storage
+    documents.delete(documentId);
+
+    console.log('[IPC] Document deleted:', documentId);
+  },
+
+  'documents:getProgress': async (event: IpcMainInvokeEvent, documentId: string) => {
+    if (!documentId) {
+      throw new Error('documentId is required');
+    }
+
+    const document = documents.get(documentId);
+    if (!document) {
+      throw new Error('Document not found');
+    }
+
+    return {
+      progress: document.embeddingProgress,
+      status: document.embeddingStatus,
+    };
+  },
+
+  'rag:getSettings': async (event: IpcMainInvokeEvent) => {
+    // TODO: Implement loading RAG settings from storage
+    // For now, return default settings
+    return {
+      chunkSize: 1000,
+      chunkOverlap: 200,
+      embeddingModel: 'nomic-embed-text',
+      ollamaBaseUrl: 'http://localhost:11434',
+      embeddingBatchSize: 10,
+      chromaBaseUrl: 'http://localhost:8000',
+      retrievalK: 5,
+      scoreThreshold: 0,
+      generationModel: 'qwen2.5:7b',
+      generationTemperature: 0.1,
+    };
+  },
+
+  'rag:saveSettings': async (event: IpcMainInvokeEvent, settings: any) => {
+    // TODO: Implement saving RAG settings to storage
+    console.log('[IPC] Saving RAG settings:', settings);
+    // Validate settings
+    if (!settings || typeof settings !== 'object') {
+      throw new Error('Settings object is required');
+    }
+
+    // Basic validation
+    if (typeof settings.chunkSize !== 'number' || settings.chunkSize < 500 || settings.chunkSize > 2000) {
+      throw new Error('chunkSize must be between 500 and 2000');
+    }
+    if (typeof settings.chunkOverlap !== 'number' || settings.chunkOverlap < 0 || settings.chunkOverlap > 500) {
+      throw new Error('chunkOverlap must be between 0 and 500');
+    }
+    if (typeof settings.retrievalK !== 'number' || settings.retrievalK < 1 || settings.retrievalK > 20) {
+      throw new Error('retrievalK must be between 1 and 20');
+    }
+
+    // TODO: Save to persistent storage (file, database, etc.)
+    return { status: 'success' };
   },
 };

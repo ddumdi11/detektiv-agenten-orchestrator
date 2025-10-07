@@ -7,6 +7,7 @@ import { DocumentLoader } from '../services/DocumentLoader';
 import { TextSplitter } from '../services/TextSplitter';
 import { EmbeddingService } from '../services/EmbeddingService';
 import { VectorStoreManager } from '../services/VectorStoreManager';
+import { OllamaEmbeddings } from '@langchain/community/embeddings/ollama';
 
 interface WitnessAgentConfig {
   mode: 'anythingllm' | 'langchain';
@@ -45,6 +46,7 @@ export class WitnessAgent {
   private embeddingService?: EmbeddingService;
   private vectorStoreManager?: VectorStoreManager;
   private documentProcessed: boolean = false;
+  private inFlightDocumentProcessing?: Promise<void>;
   private langchainConfig?: NonNullable<WitnessAgentConfig['langchain']>;
 
   constructor(config: WitnessAgentConfig) {
@@ -108,7 +110,6 @@ export class WitnessAgent {
     });
 
     // Create embeddings instance for vector store
-    const { OllamaEmbeddings } = require('@langchain/community/embeddings/ollama');
     const embeddings = new OllamaEmbeddings({
       model: 'nomic-embed-text',
       baseUrl: config.ollamaBaseUrl,
@@ -186,6 +187,7 @@ Examples of BAD answers (NEVER answer like this):
 
       // Reset document processing for fresh RAG
       this.documentProcessed = false;
+      this.inFlightDocumentProcessing = undefined;
       console.log(`[WitnessAgent] Document processing reset - will reprocess on next question`);
     }
   }
@@ -214,8 +216,8 @@ Examples of BAD answers (NEVER answer like this):
 
     const url = `${this.baseUrl}/api/v1/workspace/${this.workspaceSlug}/chat`;
 
-    console.log(`[WitnessAgent] Sending question to AnythingLLM: "${question}"`);
-    console.log(`[WitnessAgent] Session ID: ${this.sessionId}`);
+    console.log(`[WitnessAgent] Sending question to AnythingLLM (len=${question.length})`);
+    console.log(`[WitnessAgent] Session ID present: ${Boolean(this.sessionId)}`);
 
     // Prepend system prompt to establish witness role
     const systemPrompt = this.getSystemPrompt();
@@ -251,14 +253,14 @@ Examples of BAD answers (NEVER answer like this):
 
     const data = await response.json();
 
-    console.log(`[WitnessAgent] Full response:`, JSON.stringify(data, null, 2));
+    console.log(`[WitnessAgent] Response received from AnythingLLM`);
 
     // AnythingLLM returns { textResponse: "..." }
     if (!data.textResponse) {
       throw new Error('Invalid response from AnythingLLM: missing textResponse');
     }
 
-    console.log(`[WitnessAgent] Extracted answer: "${data.textResponse}"`);
+    console.log(`[WitnessAgent] Extracted answer (preview): "${String(data.textResponse).slice(0, 100)}..."`);
 
     return data.textResponse;
   }
@@ -271,12 +273,22 @@ private async askLangChain(question: string): Promise<string> {
     throw new Error('LangChain services not initialized');
   }
 
-  console.log(`[WitnessAgent] Processing question with LangChain RAG: "${question}"`);
+  console.log(`[WitnessAgent] Processing question with LangChain RAG (len=${question.length})`);
 
   try {
-    // Process document if not already done
+    // Process document if not already done (prevent race conditions)
     if (!this.documentProcessed) {
-      await this.processDocumentForLangChain();
+      if (this.inFlightDocumentProcessing) {
+        // Another call is already processing - wait for it
+        await this.inFlightDocumentProcessing;
+      } else {
+        // Start processing and store the promise
+        this.inFlightDocumentProcessing = this.processDocumentForLangChain();
+        await this.inFlightDocumentProcessing;
+        // Clear the promise and mark as processed
+        this.inFlightDocumentProcessing = undefined;
+        this.documentProcessed = true;
+      }
     }
 
     // Retrieve relevant chunks
@@ -316,7 +328,7 @@ ${answerLabel}`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'qwen2.5:7b',
+          model: 'qwen2:7b-instruct',
           prompt,
           stream: false,
           options: {
@@ -334,7 +346,7 @@ ${answerLabel}`;
     const ollamaData = await ollamaResponse.json();
     const response = ollamaData.response;
 
-    console.log(`[WitnessAgent] Generated response: "${response.substring(0, 100)}..."`);
+    console.log(`[WitnessAgent] Generated response (len=${response.length})`);
 
     return response;
   } catch (error) {

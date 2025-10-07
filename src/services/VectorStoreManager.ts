@@ -2,6 +2,7 @@
  * Vector Store Manager
  * Manages ChromaDB vector store for document embeddings
  * Provides CRUD operations and similarity search
+ * Falls back to in-memory storage for testing
  */
 
 import { Chroma } from '@langchain/community/vectorstores/chroma';
@@ -9,8 +10,9 @@ import { Document } from '@langchain/core/documents';
 import type { OllamaEmbeddings } from '@langchain/community/embeddings/ollama';
 
 export interface VectorStoreConfig {
-  url: string;              // Default: "http://localhost:8000"
+  url?: string;             // Default: "http://localhost:8000" (optional for in-memory)
   collectionName: string;   // e.g., "witness-docs-workspace123"
+  useInMemory?: boolean;    // Use in-memory store instead of ChromaDB
 }
 
 export interface SearchOptions {
@@ -164,11 +166,23 @@ export class VectorStoreManager {
     console.log(`[VectorStore] Clearing collection: ${this.config.collectionName}`);
 
     try {
-      if (this.vectorStore) {
-        // Delete all documents from collection
-        // ChromaDB will handle document cleanup
-        await this.vectorStore.delete({});
-        console.log(`[VectorStore] Collection cleared successfully`);
+      if (this.vectorStore && this.config.url) {
+        // Delete collection via ChromaDB REST API
+        const deleteUrl = `${this.config.url}/api/v1/collections/${this.config.collectionName}`;
+        const response = await fetch(deleteUrl, {
+          method: 'DELETE',
+        });
+
+        if (response.ok) {
+          console.log(`[VectorStore] Collection deleted successfully via REST API`);
+          // Reset vector store reference since collection is gone
+          this.vectorStore = null;
+        } else {
+          console.warn(`[VectorStore] REST API delete returned status ${response.status}`);
+          // Fallback: try to delete all documents
+          await this.vectorStore.delete({});
+          console.log(`[VectorStore] Fallback: deleted all documents from collection`);
+        }
       } else {
         console.log(`[VectorStore] No collection to clear`);
       }

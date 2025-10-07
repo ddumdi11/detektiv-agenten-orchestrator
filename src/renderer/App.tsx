@@ -3,7 +3,9 @@ import { InterrogationForm } from './components/InterrogationForm';
 import { ProgressDisplay } from './components/ProgressDisplay';
 import { SessionHistory } from './components/SessionHistory';
 import { SessionDetail } from './components/SessionDetail';
-import type { InterrogationProgress, SessionListItem, InterrogationSession } from './preload';
+import { DocumentManagement } from './components/DocumentManagement';
+import { RAGSettings } from './components/RAGSettings';
+import type { InterrogationProgress, SessionListItem, InterrogationSession, DocumentSource } from './preload';
 
 const App: React.FC = () => {
   const [currentProgress, setCurrentProgress] = useState<InterrogationProgress | null>(null);
@@ -11,11 +13,36 @@ const App: React.FC = () => {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<InterrogationSession | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [witnessMode, setWitnessMode] = useState<'anythingllm' | 'langchain'>('anythingllm');
+  const [selectedDocument, setSelectedDocument] = useState<DocumentSource | null>(null);
+  const [ragSettings, setRagSettings] = useState({
+    chunkSize: 1000,
+    chunkOverlap: 200,
+    embeddingModel: 'nomic-embed-text',
+    ollamaBaseUrl: 'http://localhost:11434',
+    embeddingBatchSize: 10,
+    chromaBaseUrl: 'http://localhost:8000',
+    retrievalK: 5,
+    scoreThreshold: 0,
+    generationModel: 'qwen2.5:7b',
+    generationTemperature: 0.1,
+  });
 
-  // Load session history on mount
+  // Load session history and RAG settings on mount
   useEffect(() => {
     loadSessions();
+    loadRagSettings();
   }, []);
+
+  const loadRagSettings = async () => {
+    try {
+      const settings = await window.electronAPI.rag.getSettings();
+      setRagSettings(settings);
+    } catch (error) {
+      console.error('Failed to load RAG settings:', error);
+      // Keep default settings on error
+    }
+  };
 
   // Subscribe to progress updates
   useEffect(() => {
@@ -54,17 +81,29 @@ const App: React.FC = () => {
     hypothesis: string;
     iterationLimit: number;
     detectiveProvider: 'openai' | 'anthropic' | 'gemini';
-    witnessWorkspaceSlug: string;
+    witnessWorkspaceSlug?: string;
     language: 'de' | 'en';
   }) => {
     try {
       setIsRunning(true);
-      // For now, default to anythingllm mode with backward compatibility
-      await window.electronAPI.interrogation.start({
+
+      const interrogationConfig = {
         ...config,
-        witnessMode: 'anythingllm',
-        witnessWorkspaceSlug: config.witnessWorkspaceSlug,
-      });
+        witnessMode,
+        // AnythingLLM mode
+        ...(witnessMode === 'anythingllm' && {
+          witnessWorkspaceSlug: config.witnessWorkspaceSlug,
+        }),
+        // LangChain mode
+        ...(witnessMode === 'langchain' && selectedDocument && {
+          documentPath: selectedDocument.filePath,
+          ollamaBaseUrl: 'http://localhost:11434', // Default values, will be configurable later
+          chromaBaseUrl: 'http://localhost:8000',
+          collectionName: selectedDocument.vectorStoreCollectionId,
+        }),
+      };
+
+      await window.electronAPI.interrogation.start(interrogationConfig);
     } catch (error) {
       console.error('Failed to start interrogation:', error);
       alert(`Failed to start interrogation: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -100,6 +139,41 @@ const App: React.FC = () => {
     setSelectedSession(null);
   };
 
+  const handleWitnessModeChange = (mode: 'anythingllm' | 'langchain') => {
+    setWitnessMode(mode);
+    // Clear selected document when switching away from langchain mode
+    if (mode !== 'langchain') {
+      setSelectedDocument(null);
+    }
+  };
+
+  const handleDocumentSelect = (document: DocumentSource) => {
+    setSelectedDocument(document);
+  };
+
+  const handleRagSettingsChange = (settings: typeof ragSettings) => {
+    setRagSettings(settings);
+  };
+
+  const handleSaveRagSettings = async () => {
+    await window.electronAPI.rag.saveSettings(ragSettings);
+  };
+
+  const handleResetRagSettings = () => {
+    setRagSettings({
+      chunkSize: 1000,
+      chunkOverlap: 200,
+      embeddingModel: 'nomic-embed-text',
+      ollamaBaseUrl: 'http://localhost:11434',
+      embeddingBatchSize: 10,
+      chromaBaseUrl: 'http://localhost:8000',
+      retrievalK: 5,
+      scoreThreshold: 0,
+      generationModel: 'qwen2.5:7b',
+      generationTemperature: 0.1,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -116,13 +190,23 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Interrogation & Documents */}
           <div className="space-y-6">
             <InterrogationForm
               onStartInterrogation={handleStartInterrogation}
               isRunning={isRunning}
+              witnessMode={witnessMode}
+              onWitnessModeChange={handleWitnessModeChange}
+              selectedDocument={selectedDocument}
             />
+
+            {witnessMode === 'langchain' && (
+              <DocumentManagement
+                onDocumentSelect={handleDocumentSelect}
+                selectedDocumentId={selectedDocument?.id}
+              />
+            )}
 
             {currentProgress && (
               <ProgressDisplay
@@ -132,13 +216,65 @@ const App: React.FC = () => {
             )}
           </div>
 
-          {/* Right Column */}
-          <div>
+          {/* Middle Column - Session History */}
+          <div className="lg:col-span-1">
             <SessionHistory
               sessions={sessions}
               onSelectSession={handleSelectSession}
               selectedSessionId={selectedSessionId}
             />
+          </div>
+
+          {/* Right Column - Settings and Info */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Mode Information */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Mode Information</h3>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    witnessMode === 'anythingllm'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-green-100 text-green-800'
+                  }`}>
+                    {witnessMode === 'anythingllm' ? 'AnythingLLM' : 'LangChain RAG'}
+                  </span>
+                </div>
+
+                {witnessMode === 'anythingllm' && (
+                  <p className="text-sm text-gray-600">
+                    Uses pre-embedded workspace documents. Quick to start, works with existing AnythingLLM setup.
+                  </p>
+                )}
+
+                {witnessMode === 'langchain' && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600">
+                      Uses local document processing with Ollama and ChromaDB. More control over embeddings and retrieval.
+                    </p>
+                    {selectedDocument ? (
+                      <div className="text-sm">
+                        <span className="font-medium text-gray-900">Selected:</span> {selectedDocument.filename}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-amber-600">
+                        Please upload and select a document to use LangChain mode.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* RAG Settings - Only show in LangChain mode */}
+            {witnessMode === 'langchain' && (
+              <RAGSettings
+                settings={ragSettings}
+                onSettingsChange={handleRagSettingsChange}
+                onSave={handleSaveRagSettings}
+                onReset={handleResetRagSettings}
+              />
+            )}
           </div>
         </div>
       </main>
