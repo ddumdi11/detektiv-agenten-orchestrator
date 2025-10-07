@@ -97,8 +97,8 @@ const App: React.FC = () => {
         // LangChain mode
         ...(witnessMode === 'langchain' && selectedDocument && {
           documentPath: selectedDocument.filePath,
-          ollamaBaseUrl: 'http://localhost:11434', // Default values, will be configurable later
-          chromaBaseUrl: 'http://localhost:8000',
+          ollamaBaseUrl: ragSettings.ollamaBaseUrl,
+          chromaBaseUrl: ragSettings.chromaBaseUrl,
           collectionName: selectedDocument.vectorStoreCollectionId,
         }),
       };

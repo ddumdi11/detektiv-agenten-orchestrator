@@ -284,10 +284,14 @@ private async askLangChain(question: string): Promise<string> {
       } else {
         // Start processing and store the promise
         this.inFlightDocumentProcessing = this.processDocumentForLangChain();
-        await this.inFlightDocumentProcessing;
-        // Clear the promise and mark as processed
-        this.inFlightDocumentProcessing = undefined;
-        this.documentProcessed = true;
+        try {
+          await this.inFlightDocumentProcessing;
+          // Mark as processed only on successful completion
+          this.documentProcessed = true;
+        } finally {
+          // Always clear the promise handle to allow retries on failure
+          this.inFlightDocumentProcessing = undefined;
+        }
       }
     }
 
@@ -358,13 +362,35 @@ ${answerLabel}`;
 }
 
   /**
+   * Load RAG settings from persistent storage
+   */
+  private async loadRagSettings(): Promise<any> {
+    // Import electron API to access IPC
+    const { ipcRenderer } = require('electron');
+    try {
+      return await ipcRenderer.invoke('rag:getSettings');
+    } catch (error) {
+      console.warn('[WitnessAgent] Failed to load RAG settings, using defaults:', error);
+      // Return default settings if loading fails
+      return {
+        chunkSize: 1000,
+        chunkOverlap: 200,
+        embeddingModel: 'nomic-embed-text',
+        ollamaBaseUrl: 'http://localhost:11434',
+        embeddingBatchSize: 10,
+        chromaBaseUrl: 'http://localhost:8000',
+        retrievalK: 5,
+        scoreThreshold: 0,
+        generationModel: 'qwen2.5:7b',
+        generationTemperature: 0.1,
+      };
+    }
+  }
+
+  /**
    * Process document for LangChain RAG (load, split, embed, store)
    */
   private async processDocumentForLangChain(): Promise<void> {
-    if (!this.documentLoader || !this.textSplitter || !this.embeddingService || !this.vectorStoreManager) {
-      throw new Error('LangChain services not initialized');
-    }
-
     if (!this.langchainConfig?.documentPath) {
       throw new Error('Document path not configured for LangChain mode');
     }
@@ -372,20 +398,45 @@ ${answerLabel}`;
     console.log(`[WitnessAgent] Processing document: ${this.langchainConfig.documentPath}`);
 
     try {
+      // Load RAG settings from persistent storage
+      const ragSettings = await this.loadRagSettings();
+
+      // Initialize services with user settings
+      const documentLoader = new DocumentLoader();
+      const textSplitter = new TextSplitter({
+        chunkSize: ragSettings.chunkSize,
+        chunkOverlap: ragSettings.chunkOverlap,
+      });
+      const embeddingService = new EmbeddingService({
+        baseUrl: ragSettings.ollamaBaseUrl,
+        model: ragSettings.embeddingModel,
+        batchSize: ragSettings.embeddingBatchSize,
+      });
+
+      // Create embeddings instance for vector store
+      const embeddings = new OllamaEmbeddings({
+        model: ragSettings.embeddingModel,
+        baseUrl: ragSettings.ollamaBaseUrl,
+      });
+
+      const vectorStoreManager = new VectorStoreManager(embeddings, {
+        url: ragSettings.chromaBaseUrl,
+        collectionName: this.langchainConfig.collectionName,
+      });
+
       // 1. Load document
-      const documents = await this.documentLoader.loadDocument(this.langchainConfig.documentPath);
+      const documents = await documentLoader.loadDocument(this.langchainConfig.documentPath);
       console.log(`[WitnessAgent] Loaded ${documents.length} documents`);
 
       // 2. Split into chunks
-      const chunks = await this.textSplitter.splitDocuments(documents);
+      const chunks = await textSplitter.splitDocuments(documents);
       console.log(`[WitnessAgent] Split into ${chunks.length} chunks`);
 
       // 3. Store in vector database (embeddings are handled automatically)
-      await this.vectorStoreManager.initialize();
-      await this.vectorStoreManager.addDocuments(chunks);
+      await vectorStoreManager.initialize();
+      await vectorStoreManager.addDocuments(chunks);
       console.log(`[WitnessAgent] Documents stored in vector database`);
 
-      this.documentProcessed = true;
       console.log(`[WitnessAgent] Document processing complete`);
     } catch (error) {
       console.error(`[WitnessAgent] Document processing failed:`, error);

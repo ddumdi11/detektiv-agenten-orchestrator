@@ -94,7 +94,7 @@ Da die Dokumente jetzt lokal verarbeitet werden:
    - Zitierung: Antworten beziehen sich auf Dokumentinhalt
 
 #### Beispiel-Frage
-```
+```text
 "Welche Vitamine werden im Dokument erwähnt?"
 ```
 **AnythingLLM-Antwort:** Allgemeines Wissen + Workspace-Inhalt

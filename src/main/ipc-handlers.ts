@@ -3,7 +3,7 @@
  * These handlers process requests from the renderer process
  */
 
-import { IpcMainInvokeEvent, BrowserWindow } from 'electron';
+import { IpcMainInvokeEvent, BrowserWindow, app } from 'electron';
 import { randomUUID } from 'crypto';
 import { InterrogationOrchestrator } from './InterrogationOrchestrator';
 import { DocumentLoader } from '../services/DocumentLoader';
@@ -13,6 +13,7 @@ import { VectorStoreManager } from '../services/VectorStoreManager';
 import type { DocumentSource } from '../renderer/preload';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 
 // In-memory session store (temporary - will be replaced with proper storage)
 interface InterrogationSession {
@@ -497,10 +498,21 @@ export const ipcHandlers = {
       throw new Error('File data is required');
     }
 
-    // Create temporary file path (in a real app, this would be in a proper documents folder)
-    const tempDir = path.join(process.cwd(), 'temp-documents');
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
+    // Create temporary file path in user data directory (writable in production)
+    const userDataDir = app.getPath('userData');
+    const tempDir = path.join(userDataDir, 'temp-documents');
+    try {
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+    } catch (error) {
+      console.error('[IPC] Failed to create temp directory:', error);
+      // Fallback to system temp directory
+      const fallbackDir = path.join(os.tmpdir(), 'detektiv-agenten-temp');
+      if (!fs.existsSync(fallbackDir)) {
+        fs.mkdirSync(fallbackDir, { recursive: true });
+      }
+      throw new Error(`Cannot create temp directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
     const filePath = path.join(tempDir, `${randomUUID()}-${fileData.name}`);

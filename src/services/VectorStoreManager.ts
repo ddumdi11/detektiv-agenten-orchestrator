@@ -166,22 +166,28 @@ export class VectorStoreManager {
     console.log(`[VectorStore] Clearing collection: ${this.config.collectionName}`);
 
     try {
-      if (this.vectorStore && this.config.url) {
-        // Delete collection via ChromaDB REST API
-        const deleteUrl = `${this.config.url}/api/v1/collections/${this.config.collectionName}`;
-        const response = await fetch(deleteUrl, {
-          method: 'DELETE',
-        });
+      if (this.vectorStore) {
+        if (this.config.url) {
+          // Delete collection via ChromaDB REST API
+          const deleteUrl = `${this.config.url}/api/v1/collections/${this.config.collectionName}`;
+          const response = await fetch(deleteUrl, {
+            method: 'DELETE',
+          });
 
-        if (response.ok) {
-          console.log(`[VectorStore] Collection deleted successfully via REST API`);
-          // Reset vector store reference since collection is gone
-          this.vectorStore = null;
+          if (response.ok) {
+            console.log(`[VectorStore] Collection deleted successfully via REST API`);
+            // Reset vector store reference since collection is gone
+            this.vectorStore = null;
+          } else {
+            console.warn(`[VectorStore] REST API delete returned status ${response.status}`);
+            // Fallback: try to delete all documents
+            await this.vectorStore.delete({});
+            console.log(`[VectorStore] Fallback: deleted all documents from collection`);
+          }
         } else {
-          console.warn(`[VectorStore] REST API delete returned status ${response.status}`);
-          // Fallback: try to delete all documents
+          // In-memory store: delete all documents
           await this.vectorStore.delete({});
-          console.log(`[VectorStore] Fallback: deleted all documents from collection`);
+          console.log(`[VectorStore] Deleted all documents from in-memory collection`);
         }
       } else {
         console.log(`[VectorStore] No collection to clear`);
