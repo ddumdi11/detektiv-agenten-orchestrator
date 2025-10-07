@@ -499,4 +499,157 @@ Task: "Create Configuration model in src/models/Configuration.ts"
 **Estimated Parallel Tasks**: 30 (marked with [P])
 **Sequential Tasks**: 21 (dependencies enforced)
 
+
+
+---
+
+## Phase 4: LangChain.js RAG Migration (Phase 2 Enhancement)
+
+**Context**: Current Phase 1 implementation uses AnythingLLM API for RAG. Testing with Qwen2.5:7B shows excellent results (no hallucinations, correct responses). However, LangChain.js migration provides strategic advantages:
+- **Full RAG Control**: Direct control over chunking (1000 tokens, 200 overlap), embedding (nomic-embed-text), retrieval (top-k=5)
+- **Proper System Prompts**: role: system support instead of user message workaround
+- **Dual-Support Architecture**: Users choose AnythingLLM (quick-start) or LangChain (advanced)
+- **Local Vector Store**: ChromaDB for complete offline operation
+- **Document Management**: Direct upload (PDF/TXT/DOCX) without external workspace dependency
+
+**Decisions from Clarifications (2025-10-07)**:
+- Framework: **LangChain.js** (better TypeScript support than LlamaIndex.TS)
+- Vector Store: **ChromaDB** (local HTTP API, easy setup)
+- Embedding: **nomic-embed-text** via Ollama (optimized for RAG)
+- Chunking: **1000 tokens** with 200 overlap (proven for 50k+ documents)
+- Strategy: **Dual-Support** (keep AnythingLLM, add LangChain option)
+- UI: **Settings-Panel** "Documents" tab for upload
+- Compatibility: **Read-only** for old AnythingLLM sessions
+
+### Research & Planning Tasks
+
+- [ ] **T051** Research LangChain.js vs LlamaIndex.TS for TypeScript integration
+  - Compare: API maturity, TypeScript support, Ollama integration, vector store options
+  - Evaluate: ChromaDB, Milvus, LanceDB for local vector storage
+  - Research: Embedding models (nomic-embed-text, all-minilm) via Ollama
+  - Document: Pros/cons, recommended stack, migration effort estimate
+  - File: `specs/001-detektiv-agenten-orchestrator/research-langchain.md`
+
+- [ ] **T052** Design RAG pipeline architecture
+  - Define: Document loading strategy (PDF, TXT support)
+  - Define: Text splitting strategy (chunk size, overlap for 50k+ word documents)
+  - Define: Embedding model selection (balance speed vs quality)
+  - Define: Vector store schema and indexing strategy
+  - Define: Retrieval strategy (similarity search, MMR, contextual compression)
+  - File: `specs/001-detektiv-agenten-orchestrator/rag-architecture.md`
+
+- [ ] **T053** Update data model for RAG integration
+  - Add: `DocumentSource` entity (file path, embedding status, chunk count)
+  - Add: `VectorStore` configuration (embedding model, chunk size, top_k)
+  - Update: `WitnessAgent` interface to support document management
+  - File: `specs/001-detektiv-agenten-orchestrator/data-model-v2.md`
+
+### Implementation Tasks
+
+- [ ] **T054** [P] Install LangChain/LlamaIndex dependencies
+  - Install: `langchain` or `llamaindex` (based on T051 decision)
+  - Install: Vector store client (ChromaDB/Milvus/LanceDB)
+  - Install: Document loaders (`pdf-parse`, `mammoth` for DOCX)
+  - Update: `package.json`
+
+- [ ] **T055** [P] Implement document loader service
+  - Support: PDF, TXT, DOCX file formats
+  - Text extraction and preprocessing
+  - Metadata extraction (filename, page numbers, sections)
+  - File: `src/services/DocumentLoader.ts`
+
+- [ ] **T056** [P] Implement text splitter with configurable chunking
+  - Recursive character text splitter
+  - Configurable: chunk size (default: 1000 tokens), overlap (default: 200 tokens)
+  - Preserve document structure (paragraphs, sections)
+  - File: `src/services/TextSplitter.ts`
+
+- [ ] **T057** Implement embedding service with Ollama integration
+  - Use Ollama embedding models (nomic-embed-text recommended)
+  - Batch embedding for performance
+  - Caching strategy for repeated documents
+  - File: `src/services/EmbeddingService.ts`
+
+- [ ] **T058** Implement vector store manager
+  - Initialize vector store (ChromaDB/Milvus/LanceDB based on T051)
+  - CRUD operations: add documents, search, delete collections
+  - Persistence to local directory
+  - File: `src/services/VectorStoreManager.ts`
+
+- [ ] **T059** Refactor WitnessAgent to use LangChain RAG pipeline
+  - Replace: AnythingLLM API calls with LangChain retrieval chain
+  - Implement: Proper system prompts (role: system)
+  - Implement: Context window management
+  - Implement: Retrieval with configurable top_k (default: 5 chunks)
+  - File: `src/agents/WitnessAgent.ts` (major refactor)
+
+- [ ] **T060** [P] Add document management UI component
+  - Upload documents (drag-and-drop)
+  - View embedded documents list
+  - Delete documents
+  - Embedding progress indicator
+  - File: `src/renderer/components/DocumentManager.tsx`
+
+- [ ] **T061** [P] Add RAG configuration UI
+  - Chunk size slider
+  - Embedding model selector
+  - Top-k retrieval slider
+  - Vector store selection
+  - File: `src/renderer/components/RAGSettings.tsx`
+
+### Testing Tasks
+
+- [ ] **T062** [P] Unit tests for document loading
+  - Test: PDF extraction accuracy
+  - Test: TXT encoding handling (UTF-8, Latin-1)
+  - Test: DOCX table/image handling
+  - File: `tests/unit/services/document-loader.test.ts`
+
+- [ ] **T063** [P] Unit tests for text splitting
+  - Test: Chunk size compliance
+  - Test: Overlap correctness
+  - Test: Paragraph preservation
+  - File: `tests/unit/services/text-splitter.test.ts`
+
+- [ ] **T064** [P] Integration test: End-to-end RAG pipeline
+  - Test: Upload document → Embed → Query → Retrieve relevant chunks
+  - Verify: Chunk relevance scores
+  - Verify: System prompt in LLM context
+  - File: `tests/integration/rag-pipeline.test.ts`
+
+- [ ] **T065** [P] Integration test: WitnessAgent with LangChain
+  - Test: Detective asks question → WitnessAgent retrieves + responds
+  - Verify: No hallucinations (compare with ground truth)
+  - Verify: Proper ICH-form responses (system prompt working)
+  - File: `tests/integration/witness-langchain.test.ts`
+
+### Migration & Validation
+
+- [ ] **T066** Create migration guide from AnythingLLM to LangChain
+  - Document: Breaking changes in WitnessAgent API
+  - Document: Data migration steps (if any)
+  - Document: Configuration changes needed
+  - File: `docs/MIGRATION-LANGCHAIN.md`
+
+- [ ] **T067** Performance comparison: AnythingLLM vs LangChain
+  - Benchmark: Query response time
+  - Benchmark: Retrieval accuracy (precision@k)
+  - Benchmark: Memory usage
+  - Document results and recommendations
+  - File: `docs/PERFORMANCE-COMPARISON.md`
+
+- [ ] **T068** Update CLAUDE.md with LangChain architecture
+  - Add: RAG pipeline overview
+  - Add: Vector store location
+  - Add: Embedding model configuration
+  - File: `CLAUDE.md`
+
+---
+
+**Total New Tasks**: 18 (T051-T068)
+**Estimated Parallel Tasks**: 11 (marked with [P])
+**Sequential Tasks**: 7 (dependencies on research and core services)
+
+**Dependencies**:
+- T051 
 Ready for execution via `/implement` or manual task-by-task development.

@@ -17,6 +17,7 @@ export interface DetectiveConfig {
   apiKey: string;
   model: string;
   initialStrategy?: QuestioningStrategy;
+  language?: 'de' | 'en';
 }
 
 export interface ConversationTurn {
@@ -33,10 +34,12 @@ export class DetectiveAgent {
   private currentStrategy: QuestioningStrategy;
   private anthropic?: Anthropic;
   private openai?: OpenAI;
+  private language: 'de' | 'en';
 
   constructor(config: DetectiveConfig) {
     this.config = config;
     this.currentStrategy = config.initialStrategy || 'breadth-first';
+    this.language = config.language || 'en';
 
     // Initialize LLM client based on provider
     if (config.provider === 'anthropic') {
@@ -56,7 +59,8 @@ export class DetectiveAgent {
   async interrogate(
     hypothesis: string,
     witness: { ask: (question: string) => Promise<string> },
-    maxIterations: number = 10
+    maxIterations: number = 10,
+    abortSignal?: AbortSignal
   ): Promise<{
     findings: string[];
     conversationHistory: ConversationTurn[];
@@ -73,6 +77,12 @@ export class DetectiveAgent {
     let currentQuestion = await this.generateInitialQuestion(hypothesis);
 
     while (iteration < maxIterations) {
+      // Check if interrogation should be aborted
+      if (abortSignal?.aborted) {
+        console.log('[Detective] Stop signal received, aborting interrogation');
+        break;
+      }
+
       console.log(`\n[Detective] Iteration ${iteration + 1}/${maxIterations}`);
       console.log(`[Strategy] ${this.currentStrategy}`);
       console.log(`[Question] ${currentQuestion}`);
@@ -131,20 +141,38 @@ export class DetectiveAgent {
       return hypothesis;
     }
 
-    const strategyPrompts = {
+    // Strategy prompts in both languages
+    const strategyPromptsDE = {
+      'breadth-first': `Gegeben ist das Thema/die Frage: "${hypothesis}"
+
+Stelle eine breite Frage, um einen Überblick über alle Hauptaspekte zu erhalten. Gib NUR die Frage auf Deutsch zurück, sonst nichts.`,
+      'depth-first': `Gegeben ist das Thema/die Frage: "${hypothesis}"
+
+Stelle eine spezifische Frage, um tief in einen Aspekt einzutauchen. Gib NUR die Frage auf Deutsch zurück, sonst nichts.`,
+      'contradiction': `Gegeben ist das Thema/die Frage: "${hypothesis}"
+
+Stelle eine Frage, bei der du spezifische faktische Informationen erwartest, die überprüft werden können. Gib NUR die Frage auf Deutsch zurück, sonst nichts.`,
+      'timeline': `Gegeben ist das Thema/die Frage: "${hypothesis}"
+
+Frage nach der Abfolge, dem Prozess oder dem zeitlichen Ablauf. Gib NUR die Frage auf Deutsch zurück, sonst nichts.`,
+    };
+
+    const strategyPromptsEN = {
       'breadth-first': `Given the topic/question: "${hypothesis}"
 
-Ask a broad question to get an overview of all main aspects. Return ONLY the question in the same language as the topic, nothing else.`,
+Ask a broad question to get an overview of all main aspects. Return ONLY the question in English, nothing else.`,
       'depth-first': `Given the topic/question: "${hypothesis}"
 
-Ask a specific question to dive deep into one aspect. Return ONLY the question in the same language as the topic, nothing else.`,
+Ask a specific question to dive deep into one aspect. Return ONLY the question in English, nothing else.`,
       'contradiction': `Given the topic/question: "${hypothesis}"
 
-Ask a question where you expect specific factual information that can be verified. Return ONLY the question in the same language as the topic, nothing else.`,
+Ask a question where you expect specific factual information that can be verified. Return ONLY the question in English, nothing else.`,
       'timeline': `Given the topic/question: "${hypothesis}"
 
-Ask about the sequence, process, or timeline of what happens. Return ONLY the question in the same language as the topic, nothing else.`,
+Ask about the sequence, process, or timeline of what happens. Return ONLY the question in English, nothing else.`,
     };
+
+    const strategyPrompts = this.language === 'de' ? strategyPromptsDE : strategyPromptsEN;
 
     // Call LLM based on provider
     if (this.anthropic) {
@@ -181,16 +209,29 @@ Ask about the sequence, process, or timeline of what happens. Return ONLY the qu
       }
     }
 
-    // Fallback if LLM not available - include hypothesis in all questions
-    switch (this.currentStrategy) {
-      case 'breadth-first':
-        return `What are the main aspects of this topic: ${hypothesis}?`;
-      case 'depth-first':
-        return hypothesis;
-      case 'contradiction':
-        return `What specific facts are mentioned about: ${hypothesis}?`;
-      case 'timeline':
-        return `What is the sequence or process described in: ${hypothesis}?`;
+    // Fallback if LLM not available - localized questions
+    if (this.language === 'de') {
+      switch (this.currentStrategy) {
+        case 'breadth-first':
+          return `Was sind die Hauptaspekte zu diesem Thema: ${hypothesis}?`;
+        case 'depth-first':
+          return hypothesis;
+        case 'contradiction':
+          return `Welche konkreten Fakten werden erwähnt zu: ${hypothesis}?`;
+        case 'timeline':
+          return `Welche Abfolge oder welcher Prozess wird beschrieben bei: ${hypothesis}?`;
+      }
+    } else {
+      switch (this.currentStrategy) {
+        case 'breadth-first':
+          return `What are the main aspects of this topic: ${hypothesis}?`;
+        case 'depth-first':
+          return hypothesis;
+        case 'contradiction':
+          return `What specific facts are mentioned about: ${hypothesis}?`;
+        case 'timeline':
+          return `What is the sequence or process described in: ${hypothesis}?`;
+      }
     }
   }
 
@@ -204,14 +245,48 @@ Ask about the sequence, process, or timeline of what happens. Return ONLY the qu
     findings: string[];
     curiosityTriggers: string[];
   }> {
-    const analysisPrompt = `You are a detective analyzing a witness's answer. Extract key facts and identify interesting topics for follow-up questions.
+    const analysisPromptDE = `Du bist ein Detektiv, der eine Antwort analysiert. Extrahiere wichtige Fakten und identifiziere interessante Themen für Nachfragen.
+
+Gestellte Frage: "${question}"
+Erhaltene Antwort: "${answer}"
+
+Analysiere diese Antwort und liefere:
+1. Wichtige Erkenntnisse: Konkrete Fakten, Aussagen oder Behauptungen aus der Antwort (jeweils als Aufzählungspunkt)
+2. Nachfrage-Trigger: Interessante Themen, Lücken oder Unklarheiten, die Nachfragen rechtfertigen (jeweils als Aufzählungspunkt)
+
+WICHTIG: Formuliere Nachfragen als direkte Fragen, die sich auf den Dokumentinhalt beziehen, NICHT als Meta-Fragen über "den Zeugen".
+
+Formatiere deine Antwort so:
+ERKENNTNISSE:
+- [Fakt 1]
+- [Fakt 2]
+...
+
+NACHFRAGEN:
+- [Direkte Frage zum Dokumentinhalt]
+- [Weitere direkte Frage]
+...
+
+Beispiele für GUTE Nachfragen:
+- "Welche anderen Vitamine werden im Dokument erwähnt?"
+- "Wo im Text wird dieser Name genannt?"
+
+Beispiele für SCHLECHTE Nachfragen (NIEMALS so formulieren):
+- "Warum erwähnt der Zeuge...?" ❌
+- "Woher kennt der Zeuge...?" ❌
+
+Wenn die Antwort besagt, dass die Information nicht im Dokument ist, notiere dies als Erkenntnis.`;
+
+    const analysisPromptEN = `You are a detective analyzing an answer. Extract key facts and identify interesting topics for follow-up questions.
 
 Question asked: "${question}"
-Witness answer: "${answer}"
+Answer received: "${answer}"
 
 Analyze this answer and provide:
-1. Key findings: Concrete facts, statements, or claims made by the witness (list each as a bullet point)
+1. Key findings: Concrete facts, statements, or claims from the answer (list each as a bullet point)
 2. Curiosity triggers: Interesting topics, gaps, or ambiguities that warrant follow-up questions (list each as a bullet point)
+
+IMPORTANT: Formulate follow-up questions as direct questions about the document content, NOT as meta-questions about "the witness".
 
 Format your response as:
 FINDINGS:
@@ -220,11 +295,21 @@ FINDINGS:
 ...
 
 CURIOSITY:
-- [topic 1]
-- [topic 2]
+- [Direct question about document content]
+- [Another direct question]
 ...
 
-If the witness says information is not in the document or refuses to answer, note this as a finding.`;
+Examples of GOOD follow-up questions:
+- "What other vitamins are mentioned in the document?"
+- "Where in the text is this name mentioned?"
+
+Examples of BAD follow-up questions (NEVER formulate like this):
+- "Why does the witness mention...?" ❌
+- "How does the witness know...?" ❌
+
+If the answer states that information is not in the document, note this as a finding.`;
+
+    const analysisPrompt = this.language === 'de' ? analysisPromptDE : analysisPromptEN;
 
     // Call LLM based on provider
     if (this.anthropic) {
@@ -297,7 +382,8 @@ If the witness says information is not in the document or refuses to answer, not
     const findings: string[] = [];
     const curiosityTriggers: string[] = [];
 
-    const findingsMatch = analysisText.match(/FINDINGS:\s*([\s\S]*?)(?=CURIOSITY:|$)/i);
+    // Support both English and German markers
+    const findingsMatch = analysisText.match(/(?:FINDINGS|ERKENNTNISSE):\s*([\s\S]*?)(?=(?:CURIOSITY|NACHFRAGEN):|$)/i);
     if (findingsMatch) {
       const findingsText = findingsMatch[1];
       const findingLines = findingsText
@@ -308,7 +394,7 @@ If the witness says information is not in the document or refuses to answer, not
       findings.push(...findingLines);
     }
 
-    const curiosityMatch = analysisText.match(/CURIOSITY:\s*([\s\S]*?)$/i);
+    const curiosityMatch = analysisText.match(/(?:CURIOSITY|NACHFRAGEN):\s*([\s\S]*?)$/i);
     if (curiosityMatch) {
       const curiosityText = curiosityMatch[1];
       const curiosityLines = curiosityText
@@ -384,10 +470,14 @@ If the witness says information is not in the document or refuses to answer, not
       };
     }
 
+    const defaultQuestion = this.language === 'de'
+      ? 'Erzähl mir mehr über die Details.'
+      : 'Tell me more about the details.';
+
     return {
       shouldStop: false,
       newStrategy: strategyCycle[nextIndex],
-      nextQuestion: 'Tell me more about the details.',
+      nextQuestion: defaultQuestion,
     };
   }
 }

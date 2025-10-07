@@ -61,3 +61,10 @@ playwright-report/
 
 # Build artifacts
 dist/
+
+# Test outputs and analysis files
+*Konsolenausgabe*.txt
+analysis_*.md
+*.log.txt
+test-output/
+screenshots/

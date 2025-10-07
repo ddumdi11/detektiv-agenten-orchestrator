@@ -10,6 +10,7 @@ export interface ElectronAPI {
       iterationLimit: number;
       detectiveProvider: 'openai' | 'anthropic' | 'gemini';
       witnessModel: string;
+      language: 'de' | 'en';
     }) => Promise<{ sessionId: string; status: string }>;
 
     stop: (sessionId: string) => Promise<{ status: string; partialResults: any }>;
@@ -72,6 +73,7 @@ export interface InterrogationSession {
   currentIteration: number;
   detectiveProvider: 'openai' | 'anthropic' | 'gemini';
   witnessModel: string;
+  language: 'de' | 'en';
   qaPairs: Array<{
     sequence: number;
     question: string;

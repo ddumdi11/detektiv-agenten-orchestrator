@@ -6,6 +6,7 @@ interface InterrogationFormProps {
     iterationLimit: number;
     detectiveProvider: 'openai' | 'anthropic' | 'gemini';
     witnessModel: string;
+    language: 'de' | 'en';
   }) => void;
   isRunning: boolean;
 }
@@ -18,6 +19,7 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
   const [iterationLimit, setIterationLimit] = useState(10);
   const [detectiveProvider, setDetectiveProvider] = useState<'openai' | 'anthropic' | 'gemini'>('anthropic');
   const [witnessModel, setWitnessModel] = useState('');
+  const [language, setLanguage] = useState<'de' | 'en'>('en');
 
   // Load default witness workspace on mount
   useEffect(() => {
@@ -48,6 +50,7 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
       iterationLimit,
       detectiveProvider,
       witnessModel,
+      language,
     });
   };
 
@@ -89,6 +92,23 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
             <option value="anthropic">Anthropic Claude Sonnet 4</option>
             <option value="openai">OpenAI GPT-4o-mini</option>
             <option value="gemini" disabled>Google Gemini (Coming Soon)</option>
+          </select>
+        </div>
+
+        {/* Language Selection */}
+        <div>
+          <label htmlFor="language" className="block text-sm font-medium text-gray-700 mb-2">
+            Interrogation Language
+          </label>
+          <select
+            id="language"
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as 'de' | 'en')}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            disabled={isRunning}
+          >
+            <option value="en">English</option>
+            <option value="de">Deutsch</option>
           </select>
         </div>
 

@@ -20,6 +20,12 @@ const App: React.FC = () => {
   // Subscribe to progress updates
   useEffect(() => {
     const unsubscribe = window.electronAPI.interrogation.onProgress((progress) => {
+      // If this is a new session (different sessionId), clear old progress
+      if (currentProgress && currentProgress.sessionId !== progress.sessionId) {
+        // New session started - clear old findings
+        setCurrentProgress(null);
+      }
+
       setCurrentProgress(progress);
 
       // Update running state
@@ -33,7 +39,7 @@ const App: React.FC = () => {
     });
 
     return unsubscribe;
-  }, []);
+  }, [currentProgress]);
 
   const loadSessions = async () => {
     try {
@@ -49,6 +55,7 @@ const App: React.FC = () => {
     iterationLimit: number;
     detectiveProvider: 'openai' | 'anthropic' | 'gemini';
     witnessModel: string;
+    language: 'de' | 'en';
   }) => {
     try {
       setIsRunning(true);

@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       iterationLimit: number;
       detectiveProvider: 'openai' | 'anthropic' | 'gemini';
       witnessModel: string;
+      language: 'de' | 'en';
     }) => ipcRenderer.invoke('interrogation:start', args),
 
     stop: (sessionId: string) => ipcRenderer.invoke('interrogation:stop', { sessionId }),
