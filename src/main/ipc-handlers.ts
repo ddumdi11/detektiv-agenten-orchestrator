@@ -432,4 +432,44 @@ export const ipcHandlers = {
     // TODO: Implement document progress handler
     return { progress: 0, status: 'pending' };
   },
+
+  'rag:getSettings': async (event: IpcMainInvokeEvent) => {
+    // TODO: Implement loading RAG settings from storage
+    // For now, return default settings
+    return {
+      chunkSize: 1000,
+      chunkOverlap: 200,
+      embeddingModel: 'nomic-embed-text',
+      ollamaBaseUrl: 'http://localhost:11434',
+      embeddingBatchSize: 10,
+      chromaBaseUrl: 'http://localhost:8000',
+      retrievalK: 5,
+      scoreThreshold: 0,
+      generationModel: 'qwen2.5:7b',
+      generationTemperature: 0.1,
+    };
+  },
+
+  'rag:saveSettings': async (event: IpcMainInvokeEvent, settings: any) => {
+    // TODO: Implement saving RAG settings to storage
+    console.log('[IPC] Saving RAG settings:', settings);
+    // Validate settings
+    if (!settings || typeof settings !== 'object') {
+      throw new Error('Settings object is required');
+    }
+
+    // Basic validation
+    if (typeof settings.chunkSize !== 'number' || settings.chunkSize < 500 || settings.chunkSize > 2000) {
+      throw new Error('chunkSize must be between 500 and 2000');
+    }
+    if (typeof settings.chunkOverlap !== 'number' || settings.chunkOverlap < 0 || settings.chunkOverlap > 500) {
+      throw new Error('chunkOverlap must be between 0 and 500');
+    }
+    if (typeof settings.retrievalK !== 'number' || settings.retrievalK < 1 || settings.retrievalK > 20) {
+      throw new Error('retrievalK must be between 1 and 20');
+    }
+
+    // TODO: Save to persistent storage (file, database, etc.)
+    return { status: 'success' };
+  },
 };

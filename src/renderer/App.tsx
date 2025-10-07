@@ -4,6 +4,7 @@ import { ProgressDisplay } from './components/ProgressDisplay';
 import { SessionHistory } from './components/SessionHistory';
 import { SessionDetail } from './components/SessionDetail';
 import { DocumentManagement } from './components/DocumentManagement';
+import { RAGSettings } from './components/RAGSettings';
 import type { InterrogationProgress, SessionListItem, InterrogationSession, DocumentSource } from './preload';
 
 const App: React.FC = () => {
@@ -14,11 +15,34 @@ const App: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [witnessMode, setWitnessMode] = useState<'anythingllm' | 'langchain'>('anythingllm');
   const [selectedDocument, setSelectedDocument] = useState<DocumentSource | null>(null);
+  const [ragSettings, setRagSettings] = useState({
+    chunkSize: 1000,
+    chunkOverlap: 200,
+    embeddingModel: 'nomic-embed-text',
+    ollamaBaseUrl: 'http://localhost:11434',
+    embeddingBatchSize: 10,
+    chromaBaseUrl: 'http://localhost:8000',
+    retrievalK: 5,
+    scoreThreshold: 0,
+    generationModel: 'qwen2.5:7b',
+    generationTemperature: 0.1,
+  });
 
-  // Load session history on mount
+  // Load session history and RAG settings on mount
   useEffect(() => {
     loadSessions();
+    loadRagSettings();
   }, []);
+
+  const loadRagSettings = async () => {
+    try {
+      const settings = await window.electronAPI.rag.getSettings();
+      setRagSettings(settings);
+    } catch (error) {
+      console.error('Failed to load RAG settings:', error);
+      // Keep default settings on error
+    }
+  };
 
   // Subscribe to progress updates
   useEffect(() => {
@@ -127,6 +151,29 @@ const App: React.FC = () => {
     setSelectedDocument(document);
   };
 
+  const handleRagSettingsChange = (settings: typeof ragSettings) => {
+    setRagSettings(settings);
+  };
+
+  const handleSaveRagSettings = async () => {
+    await window.electronAPI.rag.saveSettings(ragSettings);
+  };
+
+  const handleResetRagSettings = () => {
+    setRagSettings({
+      chunkSize: 1000,
+      chunkOverlap: 200,
+      embeddingModel: 'nomic-embed-text',
+      ollamaBaseUrl: 'http://localhost:11434',
+      embeddingBatchSize: 10,
+      chromaBaseUrl: 'http://localhost:8000',
+      retrievalK: 5,
+      scoreThreshold: 0,
+      generationModel: 'qwen2.5:7b',
+      generationTemperature: 0.1,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -178,8 +225,9 @@ const App: React.FC = () => {
             />
           </div>
 
-          {/* Right Column - Additional Info or Future Features */}
-          <div className="lg:col-span-1">
+          {/* Right Column - Settings and Info */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Mode Information */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Mode Information</h3>
               <div className="space-y-3">
@@ -217,6 +265,16 @@ const App: React.FC = () => {
                 )}
               </div>
             </div>
+
+            {/* RAG Settings - Only show in LangChain mode */}
+            {witnessMode === 'langchain' && (
+              <RAGSettings
+                settings={ragSettings}
+                onSettingsChange={handleRagSettingsChange}
+                onSave={handleSaveRagSettings}
+                onReset={handleResetRagSettings}
+              />
+            )}
           </div>
         </div>
       </main>

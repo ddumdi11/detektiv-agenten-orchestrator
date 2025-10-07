@@ -41,6 +41,22 @@ export interface ElectronAPI {
     getProgress: (documentId: string) => Promise<{ progress: number; status: string }>;
   };
 
+  rag: {
+    getSettings: () => Promise<{
+      chunkSize: number;
+      chunkOverlap: number;
+      embeddingModel: string;
+      ollamaBaseUrl: string;
+      embeddingBatchSize: number;
+      chromaBaseUrl: string;
+      retrievalK: number;
+      scoreThreshold: number;
+      generationModel: string;
+      generationTemperature: number;
+    }>;
+    saveSettings: (settings: any) => Promise<{ status: string }>;
+  };
+
   config: {
     updateCredentials: (args: {
       provider: 'openai' | 'anthropic' | 'gemini';
