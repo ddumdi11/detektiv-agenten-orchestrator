@@ -213,7 +213,8 @@ Examples of BAD answers (NEVER answer like this):
 
     // Prepend system prompt to establish witness role
     const systemPrompt = this.getSystemPrompt();
-    const fullMessage = `${systemPrompt}\n\n---\n\nFrage: ${question}`;
+    const questionLabel = this.language === 'de' ? 'Frage:' : 'Question:';
+    const fullMessage = `${systemPrompt}\n\n---\n\n${questionLabel} ${question}`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -283,6 +284,9 @@ private async askLangChain(question: string): Promise<string> {
     const contextLabel = this.language === 'de'
       ? 'Basierend auf diesem Kontext aus dem Dokument:'
       : 'Based on this context from the document:';
+    const questionLabel = this.language === 'de'
+      ? 'Frage:'
+      : 'Question:';
     const answerLabel = this.language === 'de'
       ? 'Antwort als Zeuge:'
       : 'Answer as witness:';
@@ -295,7 +299,7 @@ ${contextLabel}
 
 ${context}
 
-Frage: ${question}
+${questionLabel} ${question}
 
 ${answerLabel}`;
 
