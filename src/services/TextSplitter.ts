@@ -8,8 +8,8 @@ import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 import { Document } from '@langchain/core/documents';
 
 export interface TextSplitterConfig {
-  chunkSize: number;      // Default: 1000 tokens
-  chunkOverlap: number;   // Default: 200 tokens
+  chunkSize: number;      // Default: 1000 characters
+  chunkOverlap: number;   // Default: 200 characters
 }
 
 export class TextSplitter {
@@ -64,9 +64,22 @@ export class TextSplitter {
    */
   getEstimatedChunkCount(docs: Document[]): number {
     const totalLength = docs.reduce((sum, doc) => sum + doc.pageContent.length, 0);
-    // Rough estimate: average chunk size considering overlap
+
+    // Guard against invalid chunk sizes
+    if (this.config.chunkSize <= 0) {
+      return 1; // Single chunk for invalid size
+    }
+
+    // Calculate effective chunk size (considering overlap)
     const effectiveChunkSize = this.config.chunkSize - this.config.chunkOverlap;
-    return Math.ceil(totalLength / effectiveChunkSize);
+
+    // Guard against overlap >= chunkSize (would cause infinite chunks)
+    if (effectiveChunkSize <= 0) {
+      return 1; // Single chunk when overlap is too large
+    }
+
+    // Estimate chunks: (total - initial overlap) / effective size, rounded up
+    return Math.ceil((totalLength - this.config.chunkOverlap) / effectiveChunkSize);
   }
 
   /**

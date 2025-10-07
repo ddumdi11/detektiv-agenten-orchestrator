@@ -66,8 +66,8 @@ export class EmbeddingService {
    * Used for similarity search queries
    */
   async embedQuery(text: string): Promise<number[]> {
-    console.log(`[EmbeddingService] Embedding query: "${text.substring(0, 50)}..."`);
-    
+    console.log(`[EmbeddingService] Embedding query (length: ${text.length})`);
+
     try {
       const embedding = await this.embeddings.embedQuery(text);
       console.log(`[EmbeddingService] Query embedded successfully (dimension: ${embedding.length})`);

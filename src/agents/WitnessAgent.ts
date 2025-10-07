@@ -52,9 +52,15 @@ export class WitnessAgent {
     this.language = config.language || 'en';
 
     if (this.mode === 'anythingllm') {
-      this.initializeAnythingLLM(config.anythingllm!);
+      if (!config.anythingllm) {
+        throw new Error('anythingllm config is required when mode is \'anythingllm\'');
+      }
+      this.initializeAnythingLLM(config.anythingllm);
     } else if (this.mode === 'langchain') {
-      this.initializeLangChain(config.langchain!);
+      if (!config.langchain) {
+        throw new Error('langchain config is required when mode is \'langchain\'');
+      }
+      this.initializeLangChain(config.langchain);
     } else {
       throw new Error(`Invalid mode: ${this.mode}. Must be 'anythingllm' or 'langchain'`);
     }

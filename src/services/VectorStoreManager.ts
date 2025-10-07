@@ -156,25 +156,24 @@ export class VectorStoreManager {
   }
 
   /**
-   * Delete entire collection
-   * Use with caution - removes all documents
+   * Clear all documents from collection
+   * Keeps the collection but removes all stored documents
    */
-  async deleteCollection(): Promise<void> {
-    console.log(`[VectorStore] Deleting collection: ${this.config.collectionName}`);
+  async clearCollection(): Promise<void> {
+    console.log(`[VectorStore] Clearing collection: ${this.config.collectionName}`);
 
     try {
       if (this.vectorStore) {
         // Delete all documents from collection
-        // ChromaDB will handle collection cleanup
+        // ChromaDB will handle document cleanup
         await this.vectorStore.delete({});
-        this.vectorStore = null;
-        console.log(`[VectorStore] Collection deleted successfully`);
+        console.log(`[VectorStore] Collection cleared successfully`);
       } else {
-        console.log(`[VectorStore] No collection to delete`);
+        console.log(`[VectorStore] No collection to clear`);
       }
     } catch (error) {
-      console.error(`[VectorStore] Failed to delete collection:`, error);
-      throw new Error(`Failed to delete collection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(`[VectorStore] Failed to clear collection:`, error);
+      throw new Error(`Failed to clear collection: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

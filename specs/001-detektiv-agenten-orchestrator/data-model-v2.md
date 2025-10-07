@@ -427,10 +427,64 @@ export function validateDocumentSource(doc: DocumentSource): string[] {
 ```typescript
 export function validateRAGConfig(config: RAGConfiguration): string[] {
   const errors: string[] = [];
-  
+
   if (config.chunkSize < 100 || config.chunkSize > 5000) {
-    errors.push("Chunk size must be 100-5000 tokens");
+    errors.push("Chunk size must be 100-5000 characters");
   }
-  
+
   if (config.chunkOverlap < 0 || config.chunkOverlap >= config.chunkSize) {
-    errors.push("Chunk overlap must be 0 
+    errors.push("Chunk overlap must be 0 to chunkSize-1");
+  }
+
+  if (!isValidUrl(config.embeddingBaseUrl)) {
+    errors.push("Invalid embedding base URL");
+  }
+
+  if (!isValidUrl(config.vectorStoreUrl)) {
+    errors.push("Invalid vector store URL");
+  }
+
+  if (!['chromadb', 'milvus', 'lancedb'].includes(config.vectorStoreType)) {
+    errors.push("Invalid vector store type");
+  }
+
+  if (config.topK < 1 || config.topK > 20) {
+    errors.push("topK must be 1-20");
+  }
+
+  if (config.similarityThreshold < 0.0 || config.similarityThreshold > 1.0) {
+    errors.push("Similarity threshold must be 0.0-1.0");
+  }
+
+  if (!['similarity', 'mmr'].includes(config.retrievalStrategy)) {
+    errors.push("Invalid retrieval strategy");
+  }
+
+  if (config.retrievalStrategy === 'mmr') {
+    if (config.mmrLambda !== undefined && (config.mmrLambda < 0.0 || config.mmrLambda > 1.0)) {
+      errors.push("MMR lambda must be 0.0-1.0");
+    }
+    if (config.mmrFetchK !== undefined && config.mmrFetchK < config.topK) {
+      errors.push("MMR fetchK must be >= topK");
+    }
+  }
+
+  if (config.llmTemperature < 0.0 || config.llmTemperature > 2.0) {
+    errors.push("LLM temperature must be 0.0-2.0");
+  }
+
+  if (config.llmMaxTokens !== undefined && config.llmMaxTokens <= 0) {
+    errors.push("LLM max tokens must be > 0");
+  }
+
+  if (config.batchSize < 1 || config.batchSize > 50) {
+    errors.push("Batch size must be 1-50");
+  }
+
+  if (config.embeddingDimension <= 0) {
+    errors.push("Embedding dimension must be > 0");
+  }
+
+  return errors;
+}
+```
