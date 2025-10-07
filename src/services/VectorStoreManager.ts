@@ -142,8 +142,9 @@ export class VectorStoreManager {
       );
       
       // Filter by score threshold if provided
+      // ChromaDB returns distances (lower = better), so we keep results with score <= threshold
       const filteredResults = options.scoreThreshold
-        ? results.filter(([_, score]) => score >= options.scoreThreshold!)
+        ? results.filter(([_, score]) => score <= options.scoreThreshold!)
         : results;
       
       console.log(`[VectorStore] Found ${filteredResults.length} results (${results.length} before threshold filter)`);

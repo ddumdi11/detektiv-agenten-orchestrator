@@ -178,6 +178,12 @@ Examples of BAD answers (NEVER answer like this):
       this.isFirstQuestion = true;
       console.log(`[WitnessAgent] New session ID: ${this.sessionId}`);
     } else if (this.mode === 'langchain') {
+      // Clear existing vector store collection to prevent duplicates
+      if (this.vectorStoreManager) {
+        await this.vectorStoreManager.clearCollection();
+        console.log(`[WitnessAgent] Vector store collection cleared`);
+      }
+
       // Reset document processing for fresh RAG
       this.documentProcessed = false;
       console.log(`[WitnessAgent] Document processing reset - will reprocess on next question`);
