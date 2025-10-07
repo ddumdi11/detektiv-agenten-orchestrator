@@ -1,6 +1,10 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
-import { ipcHandlers } from './ipc-handlers';
+import { config as dotenvConfig } from 'dotenv';
+import { ipcHandlers, initializeOrchestrator } from './ipc-handlers';
+
+// Load environment variables from .env file
+dotenvConfig();
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -35,6 +39,9 @@ const createWindow = () => {
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
+
+  // Initialize the orchestrator with the main window
+  initializeOrchestrator(mainWindow);
 };
 
 // This method will be called when Electron has finished

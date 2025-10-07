@@ -21,6 +21,7 @@ interface InterrogationSession {
   currentIteration: number;
   detectiveProvider: 'openai' | 'anthropic' | 'gemini';
   witnessModel: string;
+  language: 'de' | 'en';
   qaPairs: Array<{
     sequence: number;
     question: string;
@@ -72,7 +73,7 @@ export const ipcHandlers = {
       throw new Error('Request body is required');
     }
 
-    const { hypothesis, iterationLimit, detectiveProvider, witnessModel } = args;
+    const { hypothesis, iterationLimit, detectiveProvider, witnessModel, language } = args;
 
     // Validate hypothesis
     if (hypothesis === undefined || hypothesis === null) {
@@ -110,6 +111,15 @@ export const ipcHandlers = {
       throw new Error('witnessModel is required');
     }
 
+    // Validate language
+    const validLanguages = ['de', 'en'];
+    if (!language) {
+      throw new Error('language is required');
+    }
+    if (!validLanguages.includes(language)) {
+      throw new Error('language is invalid (must be de or en)');
+    }
+
     // Check if another session is already running (FR-029)
     const runningSessions = Array.from(sessions.values()).filter(s => s.status === 'running');
     if (runningSessions.length > 0) {
@@ -135,6 +145,7 @@ export const ipcHandlers = {
       currentIteration: 0,
       detectiveProvider,
       witnessModel,
+      language,
       qaPairs: [],
       auditTrail: [],
     };
@@ -147,6 +158,7 @@ export const ipcHandlers = {
         witnessModel,
         iterationLimit,
         sessionId,
+        language,
       })
         .then((result) => {
           // Update session on successful completion
@@ -303,6 +315,11 @@ export const ipcHandlers = {
     // TODO: Implement actual default provider retrieval from config
     // For now, return null (no default set)
     return null;
+  },
+
+  'config:getDefaultWitness': async (event: IpcMainInvokeEvent) => {
+    // Return default witness workspace slug from environment
+    return process.env.WITNESS_WORKSPACE_SLUG || '';
   },
 
   'config:getRaw': async (event: IpcMainInvokeEvent) => {

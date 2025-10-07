@@ -24,23 +24,36 @@ Build an MVP desktop application that uses cloud-based LLMs (detective agents) t
 
 **Technical Approach**: Electron desktop app with React frontend, TypeScript backend orchestration layer, unified API clients for cloud providers (OpenAI/Anthropic/Google) and local Ollama integration, JSON-based session storage with encrypted credentials.
 
+**Phase 2 Enhancement**: Migration to LangChain.js-based RAG pipeline for direct control over document retrieval, chunking strategies, and embedding. Dual-support architecture allows users to choose between AnythingLLM (quick-start) or LangChain (advanced control). ChromaDB vector store with nomic-embed-text embeddings via Ollama.
+
 ## Technical Context
 
 **Language/Version**: TypeScript 5.x, Node.js 18.x LTS
-**Primary Dependencies**: Electron 27+, React 18+, Tailwind CSS, Axios (HTTP), Zustand (state management)
-**Storage**: JSON files for sessions/config, Electron Store for encrypted API credentials
+**Primary Dependencies**:
+  - Core: Electron 27+, React 18+, Tailwind CSS, Axios (HTTP), Zustand (state management)
+  - RAG (Phase 2): LangChain.js, ChromaDB (HTTP client), Ollama (embeddings + LLM)
+  - Document Processing: pdf-parse, mammoth (DOCX), langchain/text-splitter
+**Storage**:
+  - Sessions/Config: JSON files, Electron Store (encrypted credentials)
+  - Vectors (Phase 2): ChromaDB local instance
 **Testing**: Jest for unit tests, Playwright for E2E testing
 **Target Platform**: Windows 10+, cross-platform desktop (Electron)
 **Project Type**: Desktop application (single codebase with renderer/main process separation)
-**Performance Goals**: <2s interrogation iteration turnaround, <500ms UI response for user actions
+**Performance Goals**:
+  - <2s interrogation iteration turnaround (AnythingLLM mode)
+  - <3s with LangChain RAG (includes embedding + retrieval)
+  - <500ms UI response for user actions
 **Constraints**:
   - Configurable timeouts: Cloud APIs 15-120s, Local LLMs 15-360s
   - Single active session at a time
   - Must support offline credential management (no external auth services)
+  - ChromaDB must run locally (no external vector DB services)
 **Scale/Scope**:
-  - MVP: 1 cloud provider + Ollama witness
+  - MVP (Phase 1): AnythingLLM integration (current implementation)
+  - Phase 2: LangChain.js RAG pipeline with dual-support
   - Session storage: unlimited history (user manages)
   - Iteration limit: 5-20 per session
+  - Document limit: 100 documents per workspace (Phase 2)
 
 ## Constitution Check
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
