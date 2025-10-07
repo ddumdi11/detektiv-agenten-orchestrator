@@ -6,7 +6,6 @@
  */
 
 import { Chroma } from '@langchain/community/vectorstores/chroma';
-import { MemoryVectorStore } from '@langchain/community/vectorstores/memory';
 import { Document } from '@langchain/core/documents';
 import type { OllamaEmbeddings } from '@langchain/community/embeddings/ollama';
 
@@ -167,11 +166,23 @@ export class VectorStoreManager {
     console.log(`[VectorStore] Clearing collection: ${this.config.collectionName}`);
 
     try {
-      if (this.vectorStore) {
-        // Delete all documents from collection
-        // ChromaDB will handle document cleanup
-        await this.vectorStore.delete({});
-        console.log(`[VectorStore] Collection cleared successfully`);
+      if (this.vectorStore && this.config.url) {
+        // Delete collection via ChromaDB REST API
+        const deleteUrl = `${this.config.url}/api/v1/collections/${this.config.collectionName}`;
+        const response = await fetch(deleteUrl, {
+          method: 'DELETE',
+        });
+
+        if (response.ok) {
+          console.log(`[VectorStore] Collection deleted successfully via REST API`);
+          // Reset vector store reference since collection is gone
+          this.vectorStore = null;
+        } else {
+          console.warn(`[VectorStore] REST API delete returned status ${response.status}`);
+          // Fallback: try to delete all documents
+          await this.vectorStore.delete({});
+          console.log(`[VectorStore] Fallback: deleted all documents from collection`);
+        }
       } else {
         console.log(`[VectorStore] No collection to clear`);
       }

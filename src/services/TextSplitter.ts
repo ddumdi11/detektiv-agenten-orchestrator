@@ -79,7 +79,8 @@ export class TextSplitter {
     }
 
     // Estimate chunks: (total - initial overlap) / effective size, rounded up
-    return Math.ceil((totalLength - this.config.chunkOverlap) / effectiveChunkSize);
+    // Ensure at least 1 chunk is returned
+    return Math.max(1, Math.ceil((totalLength - this.config.chunkOverlap) / effectiveChunkSize));
   }
 
   /**

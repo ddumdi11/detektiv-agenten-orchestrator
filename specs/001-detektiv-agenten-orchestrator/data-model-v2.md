@@ -27,7 +27,7 @@ export interface DocumentSource {
   // File Information
   filePath: string;              // Original file path
   filename: string;              // Display name
-  fileType: 'pdf' | 'txt' | 'docx';
+  fileType: 'pdf' | 'txt' | 'docx' | 'html';
   fileSizeBytes: number;
   
   // Processing Status
@@ -56,7 +56,7 @@ export interface DocumentSource {
 **Validation Rules**:
 - `id`: Must be valid UUID
 - `filePath`: Must exist and be readable
-- `fileType`: Must be one of: pdf, txt, docx
+- `fileType`: Must be one of: pdf, txt, docx, html
 - `fileSizeBytes`: Must be > 0 and < 52428800 (50MB)
 - `embeddingStatus`: Must transition: pending → processing → (completed | failed)
 - `embeddingProgress`: Must be 0-100
@@ -402,7 +402,7 @@ export function validateDocumentSource(doc: DocumentSource): string[] {
     errors.push("Filename is required");
   }
   
-  if (!['pdf', 'txt', 'docx'].includes(doc.fileType)) {
+  if (!['pdf', 'txt', 'docx', 'html'].includes(doc.fileType)) {
     errors.push("Invalid file type");
   }
   

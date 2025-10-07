@@ -20,7 +20,7 @@ export class EmbeddingService {
     this.config = {
       model: config.model || 'nomic-embed-text',
       baseUrl: config.baseUrl || 'http://localhost:11434',
-      batchSize: config.batchSize || 10,
+      batchSize: Math.max(1, (config.batchSize ?? 10)),
     };
 
     this.embeddings = new OllamaEmbeddings({
@@ -35,7 +35,7 @@ export class EmbeddingService {
    */
   async embedDocuments(texts: string[]): Promise<number[][]> {
     const results: number[][] = [];
-    const batchSize = this.config.batchSize;
+    const batchSize = Math.max(1, this.config.batchSize);
 
     console.log(`[EmbeddingService] Embedding ${texts.length} texts in batches of ${batchSize}`);
 
@@ -114,14 +114,16 @@ export class EmbeddingService {
    * Update configuration (creates new embeddings instance)
    */
   updateConfig(config: Partial<EmbeddingServiceConfig>): void {
-    this.config = { ...this.config, ...config };
-    
+    const nextBatch =
+      config.batchSize !== undefined ? Math.max(1, config.batchSize) : this.config.batchSize;
+    this.config = { ...this.config, ...config, batchSize: nextBatch };
+
     // Recreate embeddings instance with new config
     this.embeddings = new OllamaEmbeddings({
       model: this.config.model,
       baseUrl: this.config.baseUrl,
     });
-    
+
     console.log(`[EmbeddingService] Configuration updated:`, this.config);
   }
 }
