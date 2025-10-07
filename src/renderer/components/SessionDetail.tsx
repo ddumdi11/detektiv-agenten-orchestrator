@@ -1,5 +1,7 @@
 import React from 'react';
 import type { InterrogationSession } from '../preload';
+import { STATUS_COLORS, STATUS_LABELS } from '../constants/session-status';
+import { calculateDuration } from '../utils/duration';
 
 interface SessionDetailProps {
   session: InterrogationSession | null;
@@ -10,20 +12,6 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ session, onClose }
   if (!session) {
     return null;
   }
-
-  const statusColors = {
-    running: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
-    'limit-reached': 'bg-yellow-100 text-yellow-800',
-  };
-
-  const statusLabels = {
-    running: 'Running',
-    completed: 'Completed',
-    failed: 'Failed',
-    'limit-reached': 'Limit Reached',
-  };
 
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);
@@ -37,24 +25,9 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ session, onClose }
     });
   };
 
-  const calculateDuration = () => {
+  const getDuration = () => {
     if (!session.endTime) return 'In progress...';
-
-    const start = new Date(session.startTime).getTime();
-    const end = new Date(session.endTime).getTime();
-    const durationMs = end - start;
-
-    const seconds = Math.floor(durationMs / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-
-    if (hours > 0) {
-      return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds % 60}s`;
-    } else {
-      return `${seconds}s`;
-    }
+    return calculateDuration(session.startTime, session.endTime);
   };
 
   return (
@@ -84,15 +57,15 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ session, onClose }
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Status</h3>
               <span
                 className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                  statusColors[session.status]
+                  STATUS_COLORS[session.status as keyof typeof STATUS_COLORS]
                 }`}
               >
-                {statusLabels[session.status]}
+                {STATUS_LABELS[session.status as keyof typeof STATUS_LABELS]}
               </span>
             </div>
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Duration</h3>
-              <p className="text-gray-900">{calculateDuration()}</p>
+              <p className="text-gray-900">{getDuration()}</p>
             </div>
           </div>
 
@@ -116,8 +89,8 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ session, onClose }
                 <p className="font-medium text-gray-900">{session.detectiveProvider}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Witness Model</p>
-                <p className="font-medium text-gray-900">{session.witnessModel}</p>
+                <p className="text-xs text-gray-500">Witness Workspace</p>
+                <p className="font-medium text-gray-900">{session.witnessWorkspaceSlug}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Iteration Limit</p>
@@ -178,7 +151,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ session, onClose }
                     >
                       {entry.event}
                     </span>
-                    <span className="text-gray-700 flex-1">{entry.reason || entry.details}</span>
+                    <span className="text-gray-700 flex-1">{entry.reason}</span>
                   </div>
                 ))}
               </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { InterrogationProgress } from '../preload';
+import { STATUS_COLORS, STATUS_LABELS } from '../constants/session-status';
 
 interface ProgressDisplayProps {
   progress: InterrogationProgress | null;
@@ -13,30 +14,16 @@ export const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ progress, onSt
 
   const progressPercentage = (progress.currentIteration / progress.totalIterations) * 100;
 
-  const statusColors = {
-    running: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
-    'limit-reached': 'bg-yellow-100 text-yellow-800',
-  };
-
-  const statusLabels = {
-    running: 'Running',
-    completed: 'Completed',
-    failed: 'Failed',
-    'limit-reached': 'Limit Reached',
-  };
-
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-gray-900">Interrogation Progress</h2>
         <span
           className={`px-3 py-1 rounded-full text-sm font-medium ${
-            statusColors[progress.status]
+            STATUS_COLORS[progress.status as keyof typeof STATUS_COLORS]
           }`}
         >
-          {statusLabels[progress.status]}
+          {STATUS_LABELS[progress.status as keyof typeof STATUS_LABELS]}
         </span>
       </div>
 

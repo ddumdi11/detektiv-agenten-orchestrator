@@ -54,7 +54,7 @@ const App: React.FC = () => {
     hypothesis: string;
     iterationLimit: number;
     detectiveProvider: 'openai' | 'anthropic' | 'gemini';
-    witnessModel: string;
+    witnessWorkspaceSlug: string;
     language: 'de' | 'en';
   }) => {
     try {

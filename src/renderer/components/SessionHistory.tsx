@@ -1,5 +1,7 @@
 import React from 'react';
 import type { SessionListItem } from '../preload';
+import { STATUS_COLORS, STATUS_LABELS } from '../constants/session-status';
+import { calculateDuration } from '../utils/duration';
 
 interface SessionHistoryProps {
   sessions: SessionListItem[];
@@ -12,19 +14,6 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
   onSelectSession,
   selectedSessionId,
 }) => {
-  const statusColors = {
-    running: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
-    'limit-reached': 'bg-yellow-100 text-yellow-800',
-  };
-
-  const statusLabels = {
-    running: 'Running',
-    completed: 'Completed',
-    failed: 'Failed',
-    'limit-reached': 'Limit Reached',
-  };
 
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);
@@ -68,10 +57,10 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
               </div>
               <span
                 className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-                  statusColors[session.status]
+                  STATUS_COLORS[session.status as keyof typeof STATUS_COLORS]
                 }`}
               >
-                {statusLabels[session.status]}
+                {STATUS_LABELS[session.status as keyof typeof STATUS_LABELS]}
               </span>
             </div>
 
@@ -88,21 +77,3 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
     </div>
   );
 };
-
-function calculateDuration(startTime: string, endTime: string): string {
-  const start = new Date(startTime).getTime();
-  const end = new Date(endTime).getTime();
-  const durationMs = end - start;
-
-  const seconds = Math.floor(durationMs / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  if (hours > 0) {
-    return `${hours}h ${minutes % 60}m`;
-  } else if (minutes > 0) {
-    return `${minutes}m ${seconds % 60}s`;
-  } else {
-    return `${seconds}s`;
-  }
-}

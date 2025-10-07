@@ -5,7 +5,7 @@ interface InterrogationFormProps {
     hypothesis: string;
     iterationLimit: number;
     detectiveProvider: 'openai' | 'anthropic' | 'gemini';
-    witnessModel: string;
+    witnessWorkspaceSlug: string;
     language: 'de' | 'en';
   }) => void;
   isRunning: boolean;
@@ -16,10 +16,12 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
   isRunning,
 }) => {
   const [hypothesis, setHypothesis] = useState('');
-  const [iterationLimit, setIterationLimit] = useState(10);
+  const [iterationLimit, setIterationLimit] = useState(5);
   const [detectiveProvider, setDetectiveProvider] = useState<'openai' | 'anthropic' | 'gemini'>('anthropic');
-  const [witnessModel, setWitnessModel] = useState('');
+  const [witnessWorkspaceSlug, setWitnessWorkspaceSlug] = useState('');
   const [language, setLanguage] = useState<'de' | 'en'>('en');
+  const [validationError, setValidationError] = useState<string>('');
+  const [loadError, setLoadError] = useState<string>('');
 
   // Load default witness workspace on mount
   useEffect(() => {
@@ -27,10 +29,10 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
       try {
         const defaultWitness = await window.electronAPI.config.getDefaultWitness();
         if (defaultWitness) {
-          setWitnessModel(defaultWitness);
+          setWitnessWorkspaceSlug(defaultWitness);
         }
-      } catch (error) {
-        console.error('Failed to load default witness:', error);
+      } catch {
+        setLoadError('Failed to load default witness workspace. Please enter manually.');
       }
     };
 
@@ -40,8 +42,11 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Clear previous validation error
+    setValidationError('');
+
     if (!hypothesis.trim()) {
-      alert('Please enter a hypothesis');
+      setValidationError('Please enter a hypothesis');
       return;
     }
 
@@ -49,7 +54,7 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
       hypothesis: hypothesis.trim(),
       iterationLimit,
       detectiveProvider,
-      witnessModel,
+      witnessWorkspaceSlug,
       language,
     });
   };
@@ -69,13 +74,28 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
           <textarea
             id="hypothesis"
             value={hypothesis}
-            onChange={(e) => setHypothesis(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            onChange={(e) => {
+              setHypothesis(e.target.value);
+              if (validationError) setValidationError('');
+            }}
+            className={`w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+              validationError ? 'border-red-300' : 'border-gray-300'
+            }`}
             rows={4}
             placeholder="Enter the hypothesis to investigate..."
             disabled={isRunning}
           />
+          {validationError && (
+            <p className="mt-1 text-sm text-red-600">{validationError}</p>
+          )}
         </div>
+
+        {/* Load Error Display */}
+        {loadError && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+            <p className="text-sm text-yellow-800">{loadError}</p>
+          </div>
+        )}
 
         {/* Detective Provider Selection */}
         <div>
@@ -112,16 +132,16 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
           </select>
         </div>
 
-        {/* Witness Model Input */}
+        {/* Witness Workspace Slug Input */}
         <div>
           <label htmlFor="witness" className="block text-sm font-medium text-gray-700 mb-2">
-            Witness Agent (Local LLM)
+            Witness Workspace (AnythingLLM)
           </label>
           <input
             type="text"
             id="witness"
-            value={witnessModel}
-            onChange={(e) => setWitnessModel(e.target.value)}
+            value={witnessWorkspaceSlug}
+            onChange={(e) => setWitnessWorkspaceSlug(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             placeholder="AnythingLLM workspace slug"
             disabled={isRunning}
@@ -136,7 +156,7 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
           <input
             type="range"
             id="iterations"
-            min="1"
+            min="5"
             max="20"
             value={iterationLimit}
             onChange={(e) => setIterationLimit(parseInt(e.target.value))}
@@ -144,7 +164,7 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
             disabled={isRunning}
           />
           <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>1</span>
+            <span>5</span>
             <span>20</span>
           </div>
         </div>

@@ -14,7 +14,7 @@ dotenv.config();
 export interface InterrogationConfig {
   hypothesis: string;
   detectiveProvider: 'openai' | 'anthropic' | 'gemini';
-  witnessModel: string;
+  witnessWorkspaceSlug: string;
   iterationLimit: number;
   sessionId: string;
   language: 'de' | 'en';
@@ -59,7 +59,7 @@ export class InterrogationOrchestrator {
       const detective = this.createDetective(config.detectiveProvider, config.language);
 
       // Initialize Witness Agent
-      const witness = this.createWitness(config.witnessModel, config.language);
+      const witness = this.createWitness(config.witnessWorkspaceSlug, config.language);
 
       // Reset chat history for new session to avoid contamination from previous sessions
       console.log('[Orchestrator] Resetting chat history for new session');
@@ -185,11 +185,11 @@ export class InterrogationOrchestrator {
   /**
    * Create Witness Agent
    */
-  private createWitness(witnessModel: string, language: 'de' | 'en'): WitnessAgent {
+  private createWitness(witnessWorkspaceSlug: string, language: 'de' | 'en'): WitnessAgent {
     const apiKey = process.env.ANYTHINGLLM_API_KEY || '';
     const baseUrl = process.env.ANYTHINGLLM_BASE_URL || 'http://localhost:3001';
-    // Use witnessModel parameter as workspace slug, fall back to env var
-    const workspaceSlug = witnessModel || process.env.WITNESS_WORKSPACE_SLUG || '';
+    // Use witnessWorkspaceSlug parameter as workspace slug, fall back to env var
+    const workspaceSlug = witnessWorkspaceSlug || process.env.WITNESS_WORKSPACE_SLUG || '';
 
     if (!apiKey || !workspaceSlug) {
       throw new Error('AnythingLLM credentials not configured');
