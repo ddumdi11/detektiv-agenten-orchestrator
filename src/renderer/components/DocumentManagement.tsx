@@ -78,7 +78,17 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({
 
     setIsUploading(true);
     try {
-      const document = await window.electronAPI.documents.upload(file);
+      // Convert File to ArrayBuffer for IPC transfer
+      const arrayBuffer = await file.arrayBuffer();
+      const fileData = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        lastModified: file.lastModified,
+        data: arrayBuffer,
+      };
+
+      const document = await window.electronAPI.documents.upload(fileData);
       setDocuments(prev => [...prev, document]);
 
       // Start progress monitoring

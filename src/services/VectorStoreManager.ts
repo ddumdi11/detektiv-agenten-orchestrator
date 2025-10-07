@@ -2,15 +2,18 @@
  * Vector Store Manager
  * Manages ChromaDB vector store for document embeddings
  * Provides CRUD operations and similarity search
+ * Falls back to in-memory storage for testing
  */
 
 import { Chroma } from '@langchain/community/vectorstores/chroma';
+import { MemoryVectorStore } from '@langchain/community/vectorstores/memory';
 import { Document } from '@langchain/core/documents';
 import type { OllamaEmbeddings } from '@langchain/community/embeddings/ollama';
 
 export interface VectorStoreConfig {
-  url: string;              // Default: "http://localhost:8000"
+  url?: string;             // Default: "http://localhost:8000" (optional for in-memory)
   collectionName: string;   // e.g., "witness-docs-workspace123"
+  useInMemory?: boolean;    // Use in-memory store instead of ChromaDB
 }
 
 export interface SearchOptions {

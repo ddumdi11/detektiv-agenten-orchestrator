@@ -316,7 +316,7 @@ ${answerLabel}`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'qwen2.5:7b',
+          model: 'qwen2:7b-instruct',
           prompt,
           stream: false,
           options: {

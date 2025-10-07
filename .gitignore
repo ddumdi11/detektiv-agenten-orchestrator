@@ -68,3 +68,7 @@ analysis_*.md
 *.log.txt
 test-output/
 screenshots/
+
+# LangChain RAG temporary files
+chroma-env/
+temp-documents/
