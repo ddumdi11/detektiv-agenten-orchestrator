@@ -1,19 +1,26 @@
 import React, { useState, useEffect } from 'react';
+import type { DocumentSource } from '../preload';
 
 interface InterrogationFormProps {
   onStartInterrogation: (config: {
     hypothesis: string;
     iterationLimit: number;
     detectiveProvider: 'openai' | 'anthropic' | 'gemini';
-    witnessWorkspaceSlug: string;
+    witnessWorkspaceSlug?: string;
     language: 'de' | 'en';
   }) => void;
   isRunning: boolean;
+  witnessMode: 'anythingllm' | 'langchain';
+  onWitnessModeChange: (mode: 'anythingllm' | 'langchain') => void;
+  selectedDocument: DocumentSource | null;
 }
 
 export const InterrogationForm: React.FC<InterrogationFormProps> = ({
   onStartInterrogation,
   isRunning,
+  witnessMode,
+  onWitnessModeChange,
+  selectedDocument,
 }) => {
   const [hypothesis, setHypothesis] = useState('');
   const [iterationLimit, setIterationLimit] = useState(5);
@@ -50,11 +57,22 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
       return;
     }
 
+    // Validate mode-specific requirements
+    if (witnessMode === 'anythingllm' && !witnessWorkspaceSlug.trim()) {
+      setValidationError('Please enter a witness workspace slug for AnythingLLM mode');
+      return;
+    }
+
+    if (witnessMode === 'langchain' && !selectedDocument) {
+      setValidationError('Please upload and select a document for LangChain mode');
+      return;
+    }
+
     onStartInterrogation({
       hypothesis: hypothesis.trim(),
       iterationLimit,
       detectiveProvider,
-      witnessWorkspaceSlug,
+      witnessWorkspaceSlug: witnessMode === 'anythingllm' ? witnessWorkspaceSlug : undefined,
       language,
     });
   };
@@ -132,21 +150,93 @@ export const InterrogationForm: React.FC<InterrogationFormProps> = ({
           </select>
         </div>
 
-        {/* Witness Workspace Slug Input */}
+        {/* Witness Mode Selection */}
         <div>
-          <label htmlFor="witness" className="block text-sm font-medium text-gray-700 mb-2">
-            Witness Workspace (AnythingLLM)
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Witness Mode
           </label>
-          <input
-            type="text"
-            id="witness"
-            value={witnessWorkspaceSlug}
-            onChange={(e) => setWitnessWorkspaceSlug(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            placeholder="AnythingLLM workspace slug"
-            disabled={isRunning}
-          />
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <input
+                id="anythingllm"
+                name="witnessMode"
+                type="radio"
+                value="anythingllm"
+                checked={witnessMode === 'anythingllm'}
+                onChange={(e) => onWitnessModeChange(e.target.value as 'anythingllm' | 'langchain')}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                disabled={isRunning}
+              />
+              <label htmlFor="anythingllm" className="ml-2 block text-sm text-gray-900">
+                <span className="font-medium">AnythingLLM</span>
+                <span className="text-gray-500 ml-1">- Pre-embedded workspace documents</span>
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                id="langchain"
+                name="witnessMode"
+                type="radio"
+                value="langchain"
+                checked={witnessMode === 'langchain'}
+                onChange={(e) => onWitnessModeChange(e.target.value as 'anythingllm' | 'langchain')}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                disabled={isRunning}
+              />
+              <label htmlFor="langchain" className="ml-2 block text-sm text-gray-900">
+                <span className="font-medium">LangChain RAG</span>
+                <span className="text-gray-500 ml-1">- Local document processing</span>
+              </label>
+            </div>
+          </div>
         </div>
+
+        {/* AnythingLLM Configuration */}
+        {witnessMode === 'anythingllm' && (
+          <div>
+            <label htmlFor="witness" className="block text-sm font-medium text-gray-700 mb-2">
+              Witness Workspace (AnythingLLM)
+            </label>
+            <input
+              type="text"
+              id="witness"
+              value={witnessWorkspaceSlug}
+              onChange={(e) => setWitnessWorkspaceSlug(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              placeholder="AnythingLLM workspace slug"
+              disabled={isRunning}
+            />
+          </div>
+        )}
+
+        {/* LangChain Configuration */}
+        {witnessMode === 'langchain' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Selected Document
+            </label>
+            <div className={`p-3 border rounded-md ${
+              selectedDocument
+                ? 'border-green-300 bg-green-50'
+                : 'border-yellow-300 bg-yellow-50'
+            }`}>
+              {selectedDocument ? (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-green-800">
+                    {selectedDocument.filename}
+                  </span>
+                  <span className="text-xs text-green-600">
+                    ({selectedDocument.fileType.toUpperCase()}, {Math.round(selectedDocument.fileSizeBytes / 1024)} KB)
+                  </span>
+                </div>
+              ) : (
+                <p className="text-sm text-yellow-800">
+                  Please upload and select a document below to use LangChain mode.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Iteration Limit */}
         <div>

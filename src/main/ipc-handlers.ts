@@ -410,4 +410,26 @@ export const ipcHandlers = {
       partialResults: session,
     };
   },
+
+  'documents:upload': async (event: IpcMainInvokeEvent, args: any) => {
+    // TODO: Implement document upload handler
+    // This will integrate with DocumentManagementService
+    throw new Error('Document upload not yet implemented');
+  },
+
+  'documents:list': async (event: IpcMainInvokeEvent) => {
+    // TODO: Implement document list handler
+    // This will return list of uploaded documents
+    return { documents: [] };
+  },
+
+  'documents:delete': async (event: IpcMainInvokeEvent, documentId: any) => {
+    // TODO: Implement document delete handler
+    throw new Error('Document delete not yet implemented');
+  },
+
+  'documents:getProgress': async (event: IpcMainInvokeEvent, documentId: any) => {
+    // TODO: Implement document progress handler
+    return { progress: 0, status: 'pending' };
+  },
 };

@@ -34,6 +34,13 @@ export interface ElectronAPI {
     load: (sessionId: string) => Promise<InterrogationSession>;
   };
 
+  documents: {
+    upload: (file: File) => Promise<DocumentSource>;
+    list: () => Promise<{ documents: DocumentSource[] }>;
+    delete: (documentId: string) => Promise<void>;
+    getProgress: (documentId: string) => Promise<{ progress: number; status: string }>;
+  };
+
   config: {
     updateCredentials: (args: {
       provider: 'openai' | 'anthropic' | 'gemini';
@@ -110,6 +117,28 @@ export interface InterrogationSession {
     contradictions: Array<{ description: string; locations: string[] }>;
     remainingGaps: string[];
     summary: string;
+  };
+}
+
+export interface DocumentSource {
+  id: string;
+  workspaceId: string;
+  filePath: string;
+  filename: string;
+  fileType: 'pdf' | 'txt' | 'docx';
+  fileSizeBytes: number;
+  uploadTimestamp: string;
+  embeddingStatus: 'pending' | 'processing' | 'completed' | 'failed';
+  embeddingProgress: number;
+  embeddingError?: string;
+  chunkCount: number;
+  totalTokens: number;
+  vectorStoreCollectionId: string;
+  extractedMetadata?: {
+    title?: string;
+    author?: string;
+    pageCount?: number;
+    sections?: string[];
   };
 }
 
