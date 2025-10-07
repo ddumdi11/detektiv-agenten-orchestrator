@@ -35,7 +35,7 @@ export interface ElectronAPI {
   };
 
   documents: {
-    upload: (file: File) => Promise<DocumentSource>;
+    upload: (file: any) => Promise<DocumentSource>; // File object from renderer
     list: () => Promise<{ documents: DocumentSource[] }>;
     delete: (documentId: string) => Promise<void>;
     getProgress: (documentId: string) => Promise<{ progress: number; status: string }>;
