@@ -59,7 +59,12 @@ const App: React.FC = () => {
   }) => {
     try {
       setIsRunning(true);
-      await window.electronAPI.interrogation.start(config);
+      // For now, default to anythingllm mode with backward compatibility
+      await window.electronAPI.interrogation.start({
+        ...config,
+        witnessMode: 'anythingllm',
+        witnessWorkspaceSlug: config.witnessWorkspaceSlug,
+      });
     } catch (error) {
       console.error('Failed to start interrogation:', error);
       alert(`Failed to start interrogation: ${error instanceof Error ? error.message : 'Unknown error'}`);

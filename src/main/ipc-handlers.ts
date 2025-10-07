@@ -20,7 +20,12 @@ interface InterrogationSession {
   iterationLimit: number;
   currentIteration: number;
   detectiveProvider: 'openai' | 'anthropic' | 'gemini';
-  witnessModel: string;
+  witnessMode: 'anythingllm' | 'langchain';
+  witnessWorkspaceSlug?: string;
+  documentPath?: string;
+  ollamaBaseUrl?: string;
+  chromaBaseUrl?: string;
+  collectionName?: string;
   language: 'de' | 'en';
   qaPairs: Array<{
     sequence: number;
@@ -73,7 +78,7 @@ export const ipcHandlers = {
       throw new Error('Request body is required');
     }
 
-    const { hypothesis, iterationLimit, detectiveProvider, witnessModel, language } = args;
+    const { hypothesis, iterationLimit, detectiveProvider, witnessMode, witnessWorkspaceSlug, documentPath, ollamaBaseUrl, chromaBaseUrl, collectionName, language } = args;
 
     // Validate hypothesis
     if (hypothesis === undefined || hypothesis === null) {
@@ -106,9 +111,24 @@ export const ipcHandlers = {
       throw new Error('detectiveProvider is invalid (must be openai, anthropic, or gemini)');
     }
 
-    // Validate witnessModel
-    if (!witnessModel) {
-      throw new Error('witnessModel is required');
+    // Validate witnessMode
+    const validWitnessModes = ['anythingllm', 'langchain'];
+    if (!witnessMode) {
+      throw new Error('witnessMode is required');
+    }
+    if (!validWitnessModes.includes(witnessMode)) {
+      throw new Error('witnessMode is invalid (must be anythingllm or langchain)');
+    }
+
+    // Validate mode-specific parameters
+    if (witnessMode === 'anythingllm') {
+      if (!witnessWorkspaceSlug) {
+        throw new Error('witnessWorkspaceSlug is required for anythingllm mode');
+      }
+    } else if (witnessMode === 'langchain') {
+      if (!documentPath) {
+        throw new Error('documentPath is required for langchain mode');
+      }
     }
 
     // Validate language
@@ -144,7 +164,12 @@ export const ipcHandlers = {
       iterationLimit,
       currentIteration: 0,
       detectiveProvider,
-      witnessModel,
+      witnessMode,
+      witnessWorkspaceSlug,
+      documentPath,
+      ollamaBaseUrl,
+      chromaBaseUrl,
+      collectionName,
       language,
       qaPairs: [],
       auditTrail: [],
@@ -155,7 +180,12 @@ export const ipcHandlers = {
     orchestrator.startInterrogation({
         hypothesis,
         detectiveProvider,
-        witnessModel,
+        witnessMode,
+        witnessWorkspaceSlug,
+        documentPath,
+        ollamaBaseUrl,
+        chromaBaseUrl,
+        collectionName,
         iterationLimit,
         sessionId,
         language,
@@ -259,7 +289,11 @@ export const ipcHandlers = {
           id: session.id,
           hypothesis: session.hypothesis.text,
           startTime: session.startTime,
+          endTime: session.endTime,
           status: session.status,
+          detectiveProvider: session.detectiveProvider,
+          currentIteration: session.currentIteration,
+          iterationLimit: session.iterationLimit,
         };
 
         // Include consistencyScore only for completed sessions

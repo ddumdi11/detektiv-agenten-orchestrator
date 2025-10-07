@@ -14,7 +14,14 @@ dotenv.config();
 export interface InterrogationConfig {
   hypothesis: string;
   detectiveProvider: 'openai' | 'anthropic' | 'gemini';
-  witnessWorkspaceSlug: string;
+  witnessMode: 'anythingllm' | 'langchain';
+  // AnythingLLM mode config
+  witnessWorkspaceSlug?: string;
+  // LangChain mode config
+  documentPath?: string;
+  ollamaBaseUrl?: string;
+  chromaBaseUrl?: string;
+  collectionName?: string;
   iterationLimit: number;
   sessionId: string;
   language: 'de' | 'en';
@@ -59,7 +66,7 @@ export class InterrogationOrchestrator {
       const detective = this.createDetective(config.detectiveProvider, config.language);
 
       // Initialize Witness Agent
-      const witness = this.createWitness(config.witnessWorkspaceSlug, config.language);
+      const witness = this.createWitness(config);
 
       // Reset chat history for new session to avoid contamination from previous sessions
       console.log('[Orchestrator] Resetting chat history for new session');
@@ -185,22 +192,48 @@ export class InterrogationOrchestrator {
   /**
    * Create Witness Agent
    */
-  private createWitness(witnessWorkspaceSlug: string, language: 'de' | 'en'): WitnessAgent {
-    const apiKey = process.env.ANYTHINGLLM_API_KEY || '';
-    const baseUrl = process.env.ANYTHINGLLM_BASE_URL || 'http://localhost:3001';
-    // Use witnessWorkspaceSlug parameter as workspace slug, fall back to env var
-    const workspaceSlug = witnessWorkspaceSlug || process.env.WITNESS_WORKSPACE_SLUG || '';
+  private createWitness(config: InterrogationConfig): WitnessAgent {
+    if (config.witnessMode === 'anythingllm') {
+      const apiKey = process.env.ANYTHINGLLM_API_KEY || '';
+      const baseUrl = process.env.ANYTHINGLLM_BASE_URL || 'http://localhost:3001';
+      const workspaceSlug = config.witnessWorkspaceSlug || process.env.WITNESS_WORKSPACE_SLUG || '';
 
-    if (!apiKey || !workspaceSlug) {
-      throw new Error('AnythingLLM credentials not configured');
+      if (!apiKey || !workspaceSlug) {
+        throw new Error('AnythingLLM credentials not configured');
+      }
+
+      return new WitnessAgent({
+        mode: 'anythingllm',
+        language: config.language,
+        anythingllm: {
+          apiKey,
+          baseUrl,
+          workspaceSlug,
+        },
+      });
+    } else if (config.witnessMode === 'langchain') {
+      const documentPath = config.documentPath || '';
+      const ollamaBaseUrl = config.ollamaBaseUrl || 'http://localhost:11434';
+      const chromaBaseUrl = config.chromaBaseUrl || 'http://localhost:8000';
+      const collectionName = config.collectionName || `witness-${config.sessionId}`;
+
+      if (!documentPath) {
+        throw new Error('Document path not configured for LangChain mode');
+      }
+
+      return new WitnessAgent({
+        mode: 'langchain',
+        language: config.language,
+        langchain: {
+          documentPath,
+          ollamaBaseUrl,
+          chromaBaseUrl,
+          collectionName,
+        },
+      });
+    } else {
+      throw new Error(`Invalid witness mode: ${config.witnessMode}`);
     }
-
-    return new WitnessAgent({
-      apiKey,
-      baseUrl,
-      workspaceSlug,
-      language,
-    });
   }
 
   /**
