@@ -9,7 +9,12 @@ export interface ElectronAPI {
       hypothesis: string;
       iterationLimit: number;
       detectiveProvider: 'openai' | 'anthropic' | 'gemini';
-      witnessWorkspaceSlug: string;
+      witnessMode: 'anythingllm' | 'langchain';
+      witnessWorkspaceSlug?: string;
+      documentPath?: string;
+      ollamaBaseUrl?: string;
+      chromaBaseUrl?: string;
+      collectionName?: string;
       language: 'de' | 'en';
     }) => Promise<{ sessionId: string; status: string }>;
 
@@ -56,7 +61,11 @@ export interface SessionListItem {
   id: string;
   hypothesis: string;
   startTime: string;
+  endTime?: string;
   status: string;
+  detectiveProvider: 'openai' | 'anthropic' | 'gemini';
+  currentIteration: number;
+  iterationLimit: number;
   consistencyScore?: number;
 }
 
@@ -72,7 +81,12 @@ export interface InterrogationSession {
   iterationLimit: number;
   currentIteration: number;
   detectiveProvider: 'openai' | 'anthropic' | 'gemini';
-  witnessWorkspaceSlug: string;
+  witnessMode: 'anythingllm' | 'langchain';
+  witnessWorkspaceSlug?: string;
+  documentPath?: string;
+  ollamaBaseUrl?: string;
+  chromaBaseUrl?: string;
+  collectionName?: string;
   language: 'de' | 'en';
   qaPairs: Array<{
     sequence: number;
