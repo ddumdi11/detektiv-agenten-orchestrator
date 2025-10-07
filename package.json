@@ -2,7 +2,7 @@
   "name": "detektiv-agenten-orchestrator",
   "version": "0.1.0",
   "description": "Desktop app using cloud LLMs to interrogate local LLMs",
-  "main": ".vite/build/main.js",
+  "main": ".vite/build/index.js",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",

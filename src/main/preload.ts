@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       iterationLimit: number;
       detectiveProvider: 'openai' | 'anthropic' | 'gemini';
       witnessModel: string;
+      language: 'de' | 'en';
     }) => ipcRenderer.invoke('interrogation:start', args),
 
     stop: (sessionId: string) => ipcRenderer.invoke('interrogation:stop', { sessionId }),
@@ -46,6 +47,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }) => ipcRenderer.invoke('config:updateCredentials', args),
 
     getDefaultDetective: () => ipcRenderer.invoke('config:getDefaultDetective'),
+
+    getDefaultWitness: () => ipcRenderer.invoke('config:getDefaultWitness'),
 
     getRaw: () => ipcRenderer.invoke('config:getRaw'),
   },

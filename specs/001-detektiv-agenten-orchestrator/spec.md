@@ -47,6 +47,15 @@
 - Q: Gleichzeitige Sessions - Soll ein Benutzer mehrere Verhör-Sessions parallel laufen lassen können? → A: Nur eine aktive Session - Start-Button deaktiviert während Verhör läuft
 - Q: API-Timeouts - Wie lange soll das System auf eine Antwort warten, bevor ein Timeout eintritt? → A: Konfigurierbarer Timeout in Settings - Cloud-APIs: 15-120 Sekunden, Lokale LLMs: 15-360 Sekunden
 
+### Session 2025-10-07 - LangChain/LlamaIndex Migration
+- Q: **LangChain vs LlamaIndex** - Welches Framework soll für die RAG-Integration verwendet werden? → A: **LangChain.js** - Reifere TypeScript-Unterstützung, größere Community, bessere Dokumentation, nahtlose Ollama-Integration
+- Q: **Vector Store Auswahl** - Welcher Vector Store soll als Standard verwendet werden (ChromaDB, Milvus, LanceDB)? → A: **ChromaDB** - Einfachste lokale Installation, gute Performance für Desktop-Anwendungen, Python-basiert aber mit HTTP-API nutzbar
+- Q: **Embedding Model** - Welches Embedding-Modell soll als Standard konfiguriert werden (nomic-embed-text, all-minilm, andere)? → A: **nomic-embed-text** via Ollama - Speziell für RAG optimiert, schnell, gute Retrieval-Qualität, läuft lokal
+- Q: **Chunk-Größe** - Welche Standard-Chunk-Größe ist optimal für 50k+ Wort-Dokumente (500, 1000, 2000 Tokens)? → A: **1000 Tokens** mit 200 Token Overlap - Guter Kompromiss zwischen Kontext-Erhaltung und Retrieval-Präzision, bewährter Standard für lange Dokumente
+- Q: **Migration-Strategie** - Soll AnythingLLM-Support beibehalten werden oder komplett durch LangChain ersetzt werden? → A: **Dual-Support** - Beide Optionen in UI wählbar (AnythingLLM für Quick-Start, LangChain für volle Kontrolle), ermöglicht schrittweise Migration
+- Q: **Dokument-Upload UI** - Wo soll die Dokument-Upload-Funktion platziert werden (Settings, Hauptfenster, separates Modal)? → A: **Settings-Panel** mit dediziertem "Documents"-Tab - Hält Hauptfenster fokussiert auf Interrogation, Dokumente sind Konfiguration
+- Q: **Backward Compatibility** - Sollen bestehende Sessions mit AnythingLLM weiterhin ladbar sein nach Migration? → A: **Ja, read-only** - Alte Sessions bleiben lesbar zur Referenz, aber nicht editierbar oder re-runnable mit neuem System
+
 ---
 
 ## User Scenarios & Testing
@@ -139,6 +148,15 @@ A user wants to get comprehensive, detailed answers from a local AI model that t
 - **FR-036**: System MUST display timeout error and offer retry when configured timeout is exceeded
 - **FR-037**: System MUST [NEEDS CLARIFICATION: Should there be limits on hypothesis input length? If yes, what is the maximum?]
 
+**RAG Integration (Future Enhancement)**
+- **FR-038**: System SHOULD support direct RAG pipeline integration via LangChain/LlamaIndex as alternative to AnythingLLM
+- **FR-039**: System SHOULD allow users to upload and manage documents for RAG (PDF, TXT, DOCX formats)
+- **FR-040**: System SHOULD provide configurable text chunking strategies (chunk size, overlap)
+- **FR-041**: System SHOULD support multiple embedding models via Ollama (nomic-embed-text, all-minilm)
+- **FR-042**: System SHOULD allow configuration of retrieval parameters (top-k chunks, similarity threshold)
+- **FR-043**: System SHOULD support proper system prompts (role: system) for witness responses
+- **FR-044**: System SHOULD provide vector store selection (ChromaDB, Milvus, LanceDB)
+
 ### Key Entities
 
 - **Hypothesis**: The initial question or statement provided by the user that drives the interrogation process
@@ -158,7 +176,7 @@ A user wants to get comprehensive, detailed answers from a local AI model that t
   - Relationships: belongs to one InterrogationSession
 
 - **Configuration**: User settings for API connections and preferences
-  - Attributes: detective API credentials, witness connection settings, selected models, timeout settings (cloud: 15-120s, local: 15-360s), provider fallback order, iteration limit preference
+  - Attributes: detective API credentials, witness connection settings, selected models, timeout settings (cloud: 15-120s, local: 15-360s), provider fallback order, iteration limit preference, RAG settings (chunk size, embedding model, top-k, vector store type)
   - Note: Must be stored securely for credentials
 
 - **GapAnalysis**: Detective's assessment of a witness answer's completeness and consistency
@@ -166,6 +184,16 @@ A user wants to get comprehensive, detailed answers from a local AI model that t
   - Gap categories: missing_information, ambiguity, inconsistency, vagueness
   - Relationships: embedded in each QuestionAnswerPair, drives follow-up question generation
   - Note: If requiresFollowUp is true, detective generates next question; if false, interrogation can conclude
+
+- **DocumentSource** (Future Enhancement): Uploaded documents for RAG pipeline
+  - Attributes: file path, file type (PDF/TXT/DOCX), upload timestamp, embedding status, chunk count, vector store collection ID
+  - Relationships: belongs to Configuration, used by WitnessAgent for retrieval
+  - Note: Enables direct document upload instead of relying on external AnythingLLM workspace
+
+- **RAGConfiguration** (Future Enhancement): Settings for LangChain/LlamaIndex RAG pipeline
+  - Attributes: chunk size (default: 1000 tokens), chunk overlap (default: 200 tokens), embedding model (default: nomic-embed-text), top-k retrieval (default: 5), vector store type (ChromaDB/Milvus/LanceDB), similarity threshold
+  - Relationships: embedded in Configuration
+  - Note: Provides fine-grained control over retrieval quality vs AnythingLLM's fixed settings
 
 ---
 
