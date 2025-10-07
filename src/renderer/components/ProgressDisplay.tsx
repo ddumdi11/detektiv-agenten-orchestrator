@@ -12,7 +12,10 @@ export const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ progress, onSt
     return null;
   }
 
-  const progressPercentage = (progress.currentIteration / progress.totalIterations) * 100;
+  // Guard against division by zero and clamp to 0-100 range
+  const progressPercentage = progress.totalIterations > 0
+    ? Math.min(100, Math.max(0, (progress.currentIteration / progress.totalIterations) * 100))
+    : 0;
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
