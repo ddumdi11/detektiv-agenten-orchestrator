@@ -253,70 +253,81 @@ Examples of BAD answers (NEVER answer like this):
   /**
    * Ask a question to the witness (LangChain RAG)
    */
-  private async askLangChain(question: string): Promise<string> {
-    if (!this.documentLoader || !this.textSplitter || !this.embeddingService || !this.vectorStoreManager) {
-      throw new Error('LangChain services not initialized');
+private async askLangChain(question: string): Promise<string> {
+  if (!this.documentLoader || !this.textSplitter || !this.embeddingService || !this.vectorStoreManager) {
+    throw new Error('LangChain services not initialized');
+  }
+
+  console.log(`[WitnessAgent] Processing question with LangChain RAG: "${question}"`);
+
+  try {
+    // Process document if not already done
+    if (!this.documentProcessed) {
+      await this.processDocumentForLangChain();
     }
 
-    console.log(`[WitnessAgent] Processing question with LangChain RAG: "${question}"`);
+    // Retrieve relevant chunks
+    const relevantDocs = await this.vectorStoreManager.search(question, { k: 5 });
+    console.log(`[WitnessAgent] Retrieved ${relevantDocs.length} relevant chunks`);
 
-    try {
-      // Process document if not already done
-      if (!this.documentProcessed) {
-        await this.processDocumentForLangChain();
-      }
+    // Build context from chunks
+    const context = relevantDocs.map(doc => doc.pageContent).join('\n\n');
 
-      // Retrieve relevant chunks
-      const relevantDocs = await this.vectorStoreManager.search(question, { k: 5 });
-      console.log(`[WitnessAgent] Retrieved ${relevantDocs.length} relevant chunks`);
+    // Build bilingual prompt text
+    const contextLabel = this.language === 'de'
+      ? 'Basierend auf diesem Kontext aus dem Dokument:'
+      : 'Based on this context from the document:';
+    const answerLabel = this.language === 'de'
+      ? 'Antwort als Zeuge:'
+      : 'Answer as witness:';
 
-      // Build context from chunks
-      const context = relevantDocs.map(doc => doc.pageContent).join('\n\n');
+    // Build prompt with system role + context + question
+    const systemPrompt = this.getSystemPrompt();
+    const prompt = `${systemPrompt}
 
-      // Build prompt with system role + context + question
-      const systemPrompt = this.getSystemPrompt();
-      const prompt = `${systemPrompt}
-
-Basierend auf diesem Kontext aus dem Dokument:
+${contextLabel}
 
 ${context}
 
 Frage: ${question}
 
-Antwort als Zeuge:`;
+${answerLabel}`;
 
-      // Query LLM via Ollama directly
-      const ollamaResponse = await fetch(`${this.embeddingService.getConfig().baseUrl}/api/generate`, {
+    // Query LLM via Ollama directly
+    const ollamaResponse = await fetch(
+      `${this.embeddingService.getConfig().baseUrl}/api/generate`,
+      {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'qwen2.5:7b',
-          prompt: prompt,
+          prompt,
           stream: false,
           options: {
             temperature: 0.1,
             num_predict: 1000,
           },
         }),
-      });
-
-      if (!ollamaResponse.ok) {
-        throw new Error(`Ollama API request failed: ${ollamaResponse.status}`);
       }
+    );
 
-      const ollamaData = await ollamaResponse.json();
-      const response = ollamaData.response;
-
-      console.log(`[WitnessAgent] Generated response: "${response.substring(0, 100)}..."`);
-
-      return response;
-    } catch (error) {
-      console.error(`[WitnessAgent] LangChain query failed:`, error);
-      throw new Error(`LangChain query failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (!ollamaResponse.ok) {
+      throw new Error(`Ollama API request failed: ${ollamaResponse.status}`);
     }
+
+    const ollamaData = await ollamaResponse.json();
+    const response = ollamaData.response;
+
+    console.log(`[WitnessAgent] Generated response: "${response.substring(0, 100)}..."`);
+
+    return response;
+  } catch (error) {
+    console.error(`[WitnessAgent] LangChain query failed:`, error);
+    throw new Error(
+      `LangChain query failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
+}
 
   /**
    * Process document for LangChain RAG (load, split, embed, store)
