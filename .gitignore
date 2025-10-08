@@ -68,3 +68,10 @@ analysis_*.md
 *.log.txt
 test-output/
 screenshots/
+
+# Chroma database files
+chroma/
+chroma-env/
+
+# Temporary documents
+temp-documents/
