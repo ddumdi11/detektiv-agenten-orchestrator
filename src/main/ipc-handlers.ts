@@ -523,7 +523,6 @@ export const ipcHandlers = {
       id: documentId,
       workspaceId: 'default-workspace', // In a real app, this would be configurable
       filePath,
-<<<<<<< HEAD
       filename: fileData.name,
       fileType,
       fileSizeBytes: fileData.size,
