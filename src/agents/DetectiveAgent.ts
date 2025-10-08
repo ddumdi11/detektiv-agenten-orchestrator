@@ -60,7 +60,14 @@ export class DetectiveAgent {
     hypothesis: string,
     witness: { ask: (question: string) => Promise<string> },
     maxIterations: number = 10,
-    abortSignal?: AbortSignal
+    abortSignal?: AbortSignal,
+    onProgress?: (progress: {
+      currentIteration: number;
+      totalIterations: number;
+      question: string;
+      answer: string;
+      findings: string[];
+    }) => void
   ): Promise<{
     findings: string[];
     conversationHistory: ConversationTurn[];
@@ -104,6 +111,17 @@ export class DetectiveAgent {
       };
       this.conversationHistory.push(turn);
       allFindings.push(...analysis.findings);
+
+      // Send progress update after each iteration
+      if (onProgress) {
+        onProgress({
+          currentIteration: iteration + 1,
+          totalIterations: maxIterations,
+          question: currentQuestion,
+          answer,
+          findings: [...allFindings],
+        });
+      }
 
       // Decide next move (strategy switch or continue)
       const nextMove = await this.decideNextMove(analysis);

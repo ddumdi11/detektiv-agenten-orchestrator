@@ -44,7 +44,7 @@ export class WitnessAgent {
   private documentLoader?: DocumentLoader;
   private textSplitter?: TextSplitter;
   private embeddingService?: EmbeddingService;
-  private vectorStoreManager?: VectorStoreManager;
+  private vectorStoreManager: VectorStoreManager | null = null;
   private documentProcessed: boolean = false;
   private inFlightDocumentProcessing?: Promise<void>;
   private langchainConfig?: NonNullable<WitnessAgentConfig['langchain']>;
@@ -102,23 +102,15 @@ export class WitnessAgent {
     // Store config for later use
     this.langchainConfig = config;
 
-    // Initialize LangChain services
+    // Initialize LangChain services (vector store will be initialized later with RAG settings)
     this.documentLoader = new DocumentLoader();
     this.textSplitter = new TextSplitter();
     this.embeddingService = new EmbeddingService({
       baseUrl: config.ollamaBaseUrl,
     });
 
-    // Create embeddings instance for vector store
-    const embeddings = new OllamaEmbeddings({
-      model: 'nomic-embed-text',
-      baseUrl: config.ollamaBaseUrl,
-    });
-
-    this.vectorStoreManager = new VectorStoreManager(embeddings, {
-      url: config.chromaBaseUrl,
-      collectionName: config.collectionName,
-    });
+    // Vector store manager will be created in processDocumentForLangChain with loaded settings
+    this.vectorStoreManager = null;
   }
 
   /**
@@ -269,9 +261,9 @@ Examples of BAD answers (NEVER answer like this):
    * Ask a question to the witness (LangChain RAG)
    */
 private async askLangChain(question: string): Promise<string> {
-  if (!this.documentLoader || !this.textSplitter || !this.embeddingService || !this.vectorStoreManager) {
-    throw new Error('LangChain services not initialized');
-  }
+ if (!this.documentLoader || !this.textSplitter || !this.embeddingService) {
+   throw new Error('LangChain services not initialized');
+ }
 
   console.log(`[WitnessAgent] Processing question with LangChain RAG (len=${question.length})`);
 
@@ -293,6 +285,11 @@ private async askLangChain(question: string): Promise<string> {
           this.inFlightDocumentProcessing = undefined;
         }
       }
+    }
+
+    // Ensure vector store is initialized
+    if (!this.vectorStoreManager) {
+      throw new Error('Vector store not initialized after document processing');
     }
 
     // Retrieve relevant chunks
@@ -363,28 +360,23 @@ ${answerLabel}`;
 
   /**
    * Load RAG settings from persistent storage
+   * Note: Currently returns defaults since IPC is not available in main process
    */
   private async loadRagSettings(): Promise<any> {
-    // Import electron API to access IPC
-    const { ipcRenderer } = require('electron');
-    try {
-      return await ipcRenderer.invoke('rag:getSettings');
-    } catch (error) {
-      console.warn('[WitnessAgent] Failed to load RAG settings, using defaults:', error);
-      // Return default settings if loading fails
-      return {
-        chunkSize: 1000,
-        chunkOverlap: 200,
-        embeddingModel: 'nomic-embed-text',
-        ollamaBaseUrl: 'http://localhost:11434',
-        embeddingBatchSize: 10,
-        chromaBaseUrl: 'http://localhost:8000',
-        retrievalK: 5,
-        scoreThreshold: 0,
-        generationModel: 'qwen2.5:7b',
-        generationTemperature: 0.1,
-      };
-    }
+    console.warn('[WitnessAgent] RAG settings loading not implemented in main process, using defaults');
+    // Return default settings
+    return {
+      chunkSize: 1000,
+      chunkOverlap: 200,
+      embeddingModel: 'nomic-embed-text',
+      ollamaBaseUrl: 'http://localhost:11434',
+      embeddingBatchSize: 10,
+      chromaBaseUrl: 'http://localhost:8000',
+      retrievalK: 5,
+      scoreThreshold: 0,
+      generationModel: 'qwen2.5:7b',
+      generationTemperature: 0.1,
+    };
   }
 
   /**
@@ -436,6 +428,9 @@ ${answerLabel}`;
       await vectorStoreManager.initialize();
       await vectorStoreManager.addDocuments(chunks);
       console.log(`[WitnessAgent] Documents stored in vector database`);
+
+      // Store the initialized vector store manager for future queries
+      this.vectorStoreManager = vectorStoreManager;
 
       console.log(`[WitnessAgent] Document processing complete`);
     } catch (error) {

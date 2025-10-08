@@ -34,6 +34,12 @@ export interface InterrogationProgress {
   question: string;
   answer: string;
   findings: string[];
+  qaPairs?: Array<{
+    sequence: number;
+    question: string;
+    answer: string;
+    timestamp: string;
+  }>;
   status: 'running' | 'completed' | 'failed' | 'limit-reached';
 }
 
@@ -41,6 +47,12 @@ export class InterrogationOrchestrator {
   private mainWindow: BrowserWindow | null;
   private activeSession: string | null = null;
   private abortControllers = new Map<string, AbortController>();
+  private currentQaPairs: Array<{
+    sequence: number;
+    question: string;
+    answer: string;
+    timestamp: string;
+  }> = [];
 
   constructor(mainWindow: BrowserWindow | null) {
     this.mainWindow = mainWindow;
@@ -56,6 +68,7 @@ export class InterrogationOrchestrator {
     }
 
     this.activeSession = config.sessionId;
+    this.currentQaPairs = []; // Reset Q&A pairs for new session
 
     // Create AbortController for this session
     const abortController = new AbortController();
@@ -80,6 +93,7 @@ export class InterrogationOrchestrator {
         question: '',
         answer: '',
         findings: [],
+        qaPairs: [],
         status: 'running',
       });
 
@@ -88,7 +102,28 @@ export class InterrogationOrchestrator {
         config.hypothesis,
         witness,
         config.iterationLimit,
-        abortController.signal
+        abortController.signal,
+        (progressUpdate) => {
+          // Add Q&A pair to history
+          this.currentQaPairs.push({
+            sequence: progressUpdate.currentIteration,
+            question: progressUpdate.question,
+            answer: progressUpdate.answer,
+            timestamp: new Date().toISOString(),
+          });
+
+          // Send progress update during interrogation
+          this.sendProgress({
+            sessionId: config.sessionId,
+            currentIteration: progressUpdate.currentIteration,
+            totalIterations: progressUpdate.totalIterations,
+            question: progressUpdate.question,
+            answer: progressUpdate.answer,
+            findings: progressUpdate.findings,
+            qaPairs: [...this.currentQaPairs],
+            status: 'running',
+          });
+        }
       );
 
       // Send completion progress
@@ -99,6 +134,7 @@ export class InterrogationOrchestrator {
         question: '',
         answer: '',
         findings: result.findings,
+        qaPairs: this.currentQaPairs,
         status: 'completed',
       });
 
@@ -114,6 +150,7 @@ export class InterrogationOrchestrator {
         question: '',
         answer: '',
         findings: [],
+        qaPairs: this.currentQaPairs,
         status: 'failed',
       });
 
@@ -150,6 +187,7 @@ export class InterrogationOrchestrator {
       question: '',
       answer: '',
       findings: [],
+      qaPairs: this.currentQaPairs,
       status: 'failed',
     });
   }
