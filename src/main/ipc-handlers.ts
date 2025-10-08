@@ -3,7 +3,7 @@
  * These handlers process requests from the renderer process
  */
 
-import { IpcMainInvokeEvent, BrowserWindow } from 'electron';
+import { IpcMainInvokeEvent, BrowserWindow, app } from 'electron';
 import { randomUUID } from 'crypto';
 import { InterrogationOrchestrator } from './InterrogationOrchestrator';
 import { DocumentLoader } from '../services/DocumentLoader';

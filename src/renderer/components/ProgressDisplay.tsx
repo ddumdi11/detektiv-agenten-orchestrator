@@ -71,6 +71,29 @@ export const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ progress, onSt
         </div>
       )}
 
+      {/* Complete Q&A History */}
+      {progress.qaPairs && progress.qaPairs.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">
+            Question & Answer History ({progress.qaPairs.length})
+          </h3>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {progress.qaPairs.map((qa, index) => (
+              <div key={index} className="border border-gray-200 rounded-md p-3">
+                <div className="mb-2">
+                  <p className="text-xs text-gray-500 mb-1">Question {qa.sequence}:</p>
+                  <p className="text-gray-900 bg-blue-50 p-2 rounded text-sm">{qa.question}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Answer:</p>
+                  <p className="text-gray-900 bg-gray-50 p-2 rounded text-sm">{qa.answer}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Findings */}
       {progress.findings.length > 0 && (
         <div className="mb-6">
