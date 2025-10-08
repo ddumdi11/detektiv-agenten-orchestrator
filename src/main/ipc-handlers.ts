@@ -3,7 +3,7 @@
  * These handlers process requests from the renderer process
  */
 
-import { IpcMainInvokeEvent, BrowserWindow } from 'electron';
+import { IpcMainInvokeEvent, BrowserWindow, app } from 'electron';
 import { randomUUID } from 'crypto';
 import { InterrogationOrchestrator } from './InterrogationOrchestrator';
 import { DocumentLoader } from '../services/DocumentLoader';
@@ -489,12 +489,12 @@ export const ipcHandlers = {
     };
   },
 
-  'documents:upload': async (event: IpcMainInvokeEvent, file: File) => {
-    console.log('[IPC] Starting document upload:', file.name);
+  'documents:upload': async (event: IpcMainInvokeEvent, fileData: any) => {
+    console.log('[IPC] Starting document upload:', fileData.name);
 
-    // Validate file
-    if (!file) {
-      throw new Error('File is required');
+    // Validate file data
+    if (!fileData || !fileData.data) {
+      throw new Error('File data is required');
     }
 
     // Create temporary file path (in a real app, this would be in a proper documents folder)
@@ -503,11 +503,19 @@ export const ipcHandlers = {
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
-    const filePath = path.join(tempDir, `${randomUUID()}-${file.name}`);
+    const filePath = path.join(tempDir, `${randomUUID()}-${fileData.name}`);
 
     // Save file to disk
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const buffer = Buffer.from(fileData.data);
     fs.writeFileSync(filePath, buffer);
+
+    // Determine file type from MIME type or extension
+    let fileType: 'pdf' | 'txt' | 'docx' = 'txt';
+    if (fileData.type.includes('pdf')) {
+      fileType = 'pdf';
+    } else if (fileData.type.includes('docx') || fileData.name.toLowerCase().endsWith('.docx')) {
+      fileType = 'docx';
+    }
 
     // Create document record
     const documentId = randomUUID();
@@ -515,9 +523,10 @@ export const ipcHandlers = {
       id: documentId,
       workspaceId: 'default-workspace', // In a real app, this would be configurable
       filePath,
-      filename: file.name,
-      fileType: file.type.includes('pdf') ? 'pdf' : file.type.includes('docx') ? 'docx' : 'txt',
-      fileSizeBytes: file.size,
+<<<<<<< HEAD
+      filename: fileData.name,
+      fileType,
+      fileSizeBytes: fileData.size,
       uploadTimestamp: new Date().toISOString(),
       embeddingStatus: 'pending',
       embeddingProgress: 0,

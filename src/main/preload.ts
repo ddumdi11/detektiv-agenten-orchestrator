@@ -38,6 +38,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     load: (sessionId: string) => ipcRenderer.invoke('sessions:load', sessionId),
   },
 
+  // Document methods
+  documents: {
+    upload: (file: File) => ipcRenderer.invoke('documents:upload', file),
+
+    list: () => ipcRenderer.invoke('documents:list'),
+
+    delete: (documentId: string) => ipcRenderer.invoke('documents:delete', documentId),
+
+    getProgress: (documentId: string) => ipcRenderer.invoke('documents:getProgress', documentId),
+  },
+
+  // RAG settings methods
+  rag: {
+    getSettings: () => ipcRenderer.invoke('rag:getSettings'),
+
+    saveSettings: (settings: any) => ipcRenderer.invoke('rag:saveSettings', settings),
+  },
+
   // Config methods
   config: {
     updateCredentials: (args: {

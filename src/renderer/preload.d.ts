@@ -77,6 +77,12 @@ export interface InterrogationProgress {
   question: string;
   answer: string;
   findings: string[];
+  qaPairs?: Array<{
+    sequence: number;
+    question: string;
+    answer: string;
+    timestamp: string;
+  }>;
   status: 'running' | 'completed' | 'failed' | 'limit-reached';
 }
 

@@ -7,6 +7,7 @@ import { DocumentLoader } from '../services/DocumentLoader';
 import { TextSplitter } from '../services/TextSplitter';
 import { EmbeddingService } from '../services/EmbeddingService';
 import { VectorStoreManager } from '../services/VectorStoreManager';
+import { OllamaEmbeddings } from '@langchain/community/embeddings/ollama';
 
 interface WitnessAgentConfig {
   mode: 'anythingllm' | 'langchain';
@@ -43,8 +44,9 @@ export class WitnessAgent {
   private documentLoader?: DocumentLoader;
   private textSplitter?: TextSplitter;
   private embeddingService?: EmbeddingService;
-  private vectorStoreManager?: VectorStoreManager;
+  private vectorStoreManager: VectorStoreManager | null = null;
   private documentProcessed: boolean = false;
+  private inFlightDocumentProcessing?: Promise<void>;
   private langchainConfig?: NonNullable<WitnessAgentConfig['langchain']>;
 
   constructor(config: WitnessAgentConfig) {
@@ -100,7 +102,7 @@ export class WitnessAgent {
     // Store config for later use
     this.langchainConfig = config;
 
-    // Initialize LangChain services
+    // Initialize LangChain services (vector store will be initialized later with RAG settings)
     this.documentLoader = new DocumentLoader();
     this.textSplitter = new TextSplitter();
     this.embeddingService = new EmbeddingService({
@@ -108,7 +110,6 @@ export class WitnessAgent {
     });
 
     // Create embeddings instance for vector store
-    const { OllamaEmbeddings } = require('@langchain/community/embeddings/ollama');
     const embeddings = new OllamaEmbeddings({
       model: 'nomic-embed-text',
       baseUrl: config.ollamaBaseUrl,
@@ -186,6 +187,7 @@ Examples of BAD answers (NEVER answer like this):
 
       // Reset document processing for fresh RAG
       this.documentProcessed = false;
+      this.inFlightDocumentProcessing = undefined;
       console.log(`[WitnessAgent] Document processing reset - will reprocess on next question`);
     }
   }
@@ -214,8 +216,8 @@ Examples of BAD answers (NEVER answer like this):
 
     const url = `${this.baseUrl}/api/v1/workspace/${this.workspaceSlug}/chat`;
 
-    console.log(`[WitnessAgent] Sending question to AnythingLLM: "${question}"`);
-    console.log(`[WitnessAgent] Session ID: ${this.sessionId}`);
+    console.log(`[WitnessAgent] Sending question to AnythingLLM (len=${question.length})`);
+    console.log(`[WitnessAgent] Session ID present: ${Boolean(this.sessionId)}`);
 
     // Prepend system prompt to establish witness role
     const systemPrompt = this.getSystemPrompt();
@@ -251,14 +253,14 @@ Examples of BAD answers (NEVER answer like this):
 
     const data = await response.json();
 
-    console.log(`[WitnessAgent] Full response:`, JSON.stringify(data, null, 2));
+    console.log(`[WitnessAgent] Response received from AnythingLLM`);
 
     // AnythingLLM returns { textResponse: "..." }
     if (!data.textResponse) {
       throw new Error('Invalid response from AnythingLLM: missing textResponse');
     }
 
-    console.log(`[WitnessAgent] Extracted answer: "${data.textResponse}"`);
+    console.log(`[WitnessAgent] Extracted answer (preview): "${String(data.textResponse).slice(0, 100)}..."`);
 
     return data.textResponse;
   }
@@ -267,16 +269,26 @@ Examples of BAD answers (NEVER answer like this):
    * Ask a question to the witness (LangChain RAG)
    */
 private async askLangChain(question: string): Promise<string> {
-  if (!this.documentLoader || !this.textSplitter || !this.embeddingService || !this.vectorStoreManager) {
-    throw new Error('LangChain services not initialized');
-  }
+ if (!this.documentLoader || !this.textSplitter || !this.embeddingService) {
+   throw new Error('LangChain services not initialized');
+ }
 
-  console.log(`[WitnessAgent] Processing question with LangChain RAG: "${question}"`);
+  console.log(`[WitnessAgent] Processing question with LangChain RAG (len=${question.length})`);
 
   try {
-    // Process document if not already done
+    // Process document if not already done (prevent race conditions)
     if (!this.documentProcessed) {
-      await this.processDocumentForLangChain();
+      if (this.inFlightDocumentProcessing) {
+        // Another call is already processing - wait for it
+        await this.inFlightDocumentProcessing;
+      } else {
+        // Start processing and store the promise
+        this.inFlightDocumentProcessing = this.processDocumentForLangChain();
+        await this.inFlightDocumentProcessing;
+        // Clear the promise and mark as processed
+        this.inFlightDocumentProcessing = undefined;
+        this.documentProcessed = true;
+      }
     }
 
     // Retrieve relevant chunks
@@ -316,7 +328,7 @@ ${answerLabel}`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'qwen2.5:7b',
+          model: 'qwen2:7b-instruct',
           prompt,
           stream: false,
           options: {
@@ -334,7 +346,7 @@ ${answerLabel}`;
     const ollamaData = await ollamaResponse.json();
     const response = ollamaData.response;
 
-    console.log(`[WitnessAgent] Generated response: "${response.substring(0, 100)}..."`);
+    console.log(`[WitnessAgent] Generated response (len=${response.length})`);
 
     return response;
   } catch (error) {
@@ -346,13 +358,30 @@ ${answerLabel}`;
 }
 
   /**
+   * Load RAG settings from persistent storage
+   * Note: Currently returns defaults since IPC is not available in main process
+   */
+  private async loadRagSettings(): Promise<any> {
+    console.warn('[WitnessAgent] RAG settings loading not implemented in main process, using defaults');
+    // Return default settings
+    return {
+      chunkSize: 1000,
+      chunkOverlap: 200,
+      embeddingModel: 'nomic-embed-text',
+      ollamaBaseUrl: 'http://localhost:11434',
+      embeddingBatchSize: 10,
+      chromaBaseUrl: 'http://localhost:8000',
+      retrievalK: 5,
+      scoreThreshold: 0,
+      generationModel: 'qwen2.5:7b',
+      generationTemperature: 0.1,
+    };
+  }
+
+  /**
    * Process document for LangChain RAG (load, split, embed, store)
    */
   private async processDocumentForLangChain(): Promise<void> {
-    if (!this.documentLoader || !this.textSplitter || !this.embeddingService || !this.vectorStoreManager) {
-      throw new Error('LangChain services not initialized');
-    }
-
     if (!this.langchainConfig?.documentPath) {
       throw new Error('Document path not configured for LangChain mode');
     }
@@ -360,20 +389,48 @@ ${answerLabel}`;
     console.log(`[WitnessAgent] Processing document: ${this.langchainConfig.documentPath}`);
 
     try {
+      // Load RAG settings from persistent storage
+      const ragSettings = await this.loadRagSettings();
+
+      // Initialize services with user settings
+      const documentLoader = new DocumentLoader();
+      const textSplitter = new TextSplitter({
+        chunkSize: ragSettings.chunkSize,
+        chunkOverlap: ragSettings.chunkOverlap,
+      });
+      const embeddingService = new EmbeddingService({
+        baseUrl: ragSettings.ollamaBaseUrl,
+        model: ragSettings.embeddingModel,
+        batchSize: ragSettings.embeddingBatchSize,
+      });
+
+      // Create embeddings instance for vector store
+      const embeddings = new OllamaEmbeddings({
+        model: ragSettings.embeddingModel,
+        baseUrl: ragSettings.ollamaBaseUrl,
+      });
+
+      const vectorStoreManager = new VectorStoreManager(embeddings, {
+        url: ragSettings.chromaBaseUrl,
+        collectionName: this.langchainConfig.collectionName,
+      });
+
       // 1. Load document
-      const documents = await this.documentLoader.loadDocument(this.langchainConfig.documentPath);
+      const documents = await documentLoader.loadDocument(this.langchainConfig.documentPath);
       console.log(`[WitnessAgent] Loaded ${documents.length} documents`);
 
       // 2. Split into chunks
-      const chunks = await this.textSplitter.splitDocuments(documents);
+      const chunks = await textSplitter.splitDocuments(documents);
       console.log(`[WitnessAgent] Split into ${chunks.length} chunks`);
 
       // 3. Store in vector database (embeddings are handled automatically)
-      await this.vectorStoreManager.initialize();
-      await this.vectorStoreManager.addDocuments(chunks);
+      await vectorStoreManager.initialize();
+      await vectorStoreManager.addDocuments(chunks);
       console.log(`[WitnessAgent] Documents stored in vector database`);
 
-      this.documentProcessed = true;
+      // Store the initialized vector store manager for future queries
+      this.vectorStoreManager = vectorStoreManager;
+
       console.log(`[WitnessAgent] Document processing complete`);
     } catch (error) {
       console.error(`[WitnessAgent] Document processing failed:`, error);

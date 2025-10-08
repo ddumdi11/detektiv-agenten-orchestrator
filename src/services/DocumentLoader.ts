@@ -1,14 +1,14 @@
 /**
  * Document Loader Service
  * Loads and extracts text from various document formats
- * Supports: TXT, HTML (PDF and DOCX support can be added later)
+ * Supports: TXT, HTML, PDF, DOCX
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Document } from '@langchain/core/documents';
 
-export type SupportedFileType = 'txt' | 'html';
+export type SupportedFileType = 'txt' | 'html' | 'pdf' | 'docx';
 
 export interface DocumentMetadata {
   source: string;
@@ -23,7 +23,7 @@ export class DocumentLoader {
    * Get list of supported file extensions
    */
   getSupportedFormats(): string[] {
-    return ['.txt', '.html', '.htm'];
+    return ['.txt', '.html', '.htm', '.pdf', '.docx'];
   }
 
   /**
@@ -53,11 +53,17 @@ export class DocumentLoader {
     switch (ext) {
       case '.txt':
         return this.loadTextFile(filePath, filename, fileSizeBytes);
-      
+
       case '.html':
       case '.htm':
         return this.loadHTMLFile(filePath, filename, fileSizeBytes);
-      
+
+      case '.pdf':
+        return this.loadPDFFile(filePath, filename, fileSizeBytes);
+
+      case '.docx':
+        return this.loadDOCXFile(filePath, filename, fileSizeBytes);
+
       default:
         throw new Error(`Unsupported file type: ${ext}. Supported: ${this.getSupportedFormats().join(', ')}`);
     }
@@ -123,6 +129,76 @@ export class DocumentLoader {
       source: filePath,
       filename,
       fileType: 'html',
+      fileSizeBytes,
+      encoding: 'utf-8',
+    };
+
+    // Return as single document
+    return [
+      new Document({
+        pageContent: textContent,
+        metadata,
+      }),
+    ];
+  }
+
+  /**
+   * Load PDF file and extract text content
+   */
+  private async loadPDFFile(
+    filePath: string,
+    filename: string,
+    fileSizeBytes: number
+  ): Promise<Document[]> {
+    // Read PDF file as buffer
+    const buffer = await fs.readFile(filePath);
+
+    // Use require for CommonJS module pdf-parse
+    const pdfParse = require('pdf-parse');
+
+    // Parse PDF and extract text
+    const pdfData = await pdfParse(buffer);
+    const textContent = pdfData.text;
+
+    // Create metadata
+    const metadata: DocumentMetadata = {
+      source: filePath,
+      filename,
+      fileType: 'pdf',
+      fileSizeBytes,
+      encoding: 'utf-8',
+    };
+
+    // Return as single document
+    return [
+      new Document({
+        pageContent: textContent,
+        metadata,
+      }),
+    ];
+  }
+
+  /**
+   * Load DOCX file and extract text content
+   */
+  private async loadDOCXFile(
+    filePath: string,
+    filename: string,
+    fileSizeBytes: number
+  ): Promise<Document[]> {
+    // Read DOCX file as buffer
+    const buffer = await fs.readFile(filePath);
+
+    // Extract text from DOCX using mammoth
+    const mammoth = require('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const textContent = result.value;
+
+    // Create metadata
+    const metadata: DocumentMetadata = {
+      source: filePath,
+      filename,
+      fileType: 'docx',
       fileSizeBytes,
       encoding: 'utf-8',
     };
