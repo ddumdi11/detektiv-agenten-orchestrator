@@ -69,6 +69,21 @@ analysis_*.md
 test-output/
 screenshots/
 
+# Image files (screenshots, bugs, etc.)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+
+# Test documents
+test-document.txt
+Test_Dokument.txt
+*test*.txt
+
+# Local backup files
+*.local
+
 # Chroma database files
 chroma/
 chroma-env/
