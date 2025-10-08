@@ -147,7 +147,7 @@ export interface DocumentSource {
   workspaceId: string;
   filePath: string;
   filename: string;
-  fileType: 'pdf' | 'txt' | 'docx' | 'html';
+  fileType: 'pdf' | 'txt' | 'docx';
   fileSizeBytes: number;
   uploadTimestamp: string;
   embeddingStatus: 'pending' | 'processing' | 'completed' | 'failed';

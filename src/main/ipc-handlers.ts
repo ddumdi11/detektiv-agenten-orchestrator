@@ -13,7 +13,6 @@ import { VectorStoreManager } from '../services/VectorStoreManager';
 import type { DocumentSource } from '../renderer/preload';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 
 // In-memory session store (temporary - will be replaced with proper storage)
 interface InterrogationSession {
@@ -498,21 +497,10 @@ export const ipcHandlers = {
       throw new Error('File data is required');
     }
 
-    // Create temporary file path in user data directory (writable in production)
-    const userDataDir = app.getPath('userData');
-    let tempDir = path.join(userDataDir, 'temp-documents');
-    try {
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
-    } catch (error) {
-      console.error('[IPC] Failed to create temp directory:', error);
-      // Fallback to system temp directory
-      const fallbackDir = path.join(os.tmpdir(), 'detektiv-agenten-temp');
-      if (!fs.existsSync(fallbackDir)) {
-        fs.mkdirSync(fallbackDir, { recursive: true });
-      }
-      tempDir = fallbackDir;
+    // Create temporary file path (in a real app, this would be in a proper documents folder)
+    const tempDir = path.join(process.cwd(), 'temp-documents');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
     }
 
     const filePath = path.join(tempDir, `${randomUUID()}-${fileData.name}`);

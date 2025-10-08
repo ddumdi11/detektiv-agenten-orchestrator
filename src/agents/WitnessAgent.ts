@@ -109,8 +109,16 @@ export class WitnessAgent {
       baseUrl: config.ollamaBaseUrl,
     });
 
-    // Vector store manager will be created in processDocumentForLangChain with loaded settings
-    this.vectorStoreManager = null;
+    // Create embeddings instance for vector store
+    const embeddings = new OllamaEmbeddings({
+      model: 'nomic-embed-text',
+      baseUrl: config.ollamaBaseUrl,
+    });
+
+    this.vectorStoreManager = new VectorStoreManager(embeddings, {
+      url: config.chromaBaseUrl,
+      collectionName: config.collectionName,
+    });
   }
 
   /**
@@ -276,20 +284,11 @@ private async askLangChain(question: string): Promise<string> {
       } else {
         // Start processing and store the promise
         this.inFlightDocumentProcessing = this.processDocumentForLangChain();
-        try {
-          await this.inFlightDocumentProcessing;
-          // Mark as processed only on successful completion
-          this.documentProcessed = true;
-        } finally {
-          // Always clear the promise handle to allow retries on failure
-          this.inFlightDocumentProcessing = undefined;
-        }
+        await this.inFlightDocumentProcessing;
+        // Clear the promise and mark as processed
+        this.inFlightDocumentProcessing = undefined;
+        this.documentProcessed = true;
       }
-    }
-
-    // Ensure vector store is initialized
-    if (!this.vectorStoreManager) {
-      throw new Error('Vector store not initialized after document processing');
     }
 
     // Retrieve relevant chunks

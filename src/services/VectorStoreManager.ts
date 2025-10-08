@@ -166,46 +166,22 @@ export class VectorStoreManager {
     console.log(`[VectorStore] Clearing collection: ${this.config.collectionName}`);
 
     try {
-      if (this.vectorStore) {
-        if (this.config.url) {
-          // Delete collection via ChromaDB REST API
-          const deleteUrl = `${this.config.url}/api/v1/collections/${this.config.collectionName}`;
+      if (this.vectorStore && this.config.url) {
+        // Delete collection via ChromaDB REST API
+        const deleteUrl = `${this.config.url}/api/v1/collections/${this.config.collectionName}`;
+        const response = await fetch(deleteUrl, {
+          method: 'DELETE',
+        });
 
-          try {
-            const response = await fetch(deleteUrl, {
-              method: 'DELETE',
-            });
-
-            if (response.ok) {
-              console.log(`[VectorStore] Collection deleted successfully via REST API`);
-              // Reset vector store reference since collection is gone
-              this.vectorStore = null;
-            } else {
-              console.warn(`[VectorStore] REST API delete returned status ${response.status}`);
-              // Fallback: try to delete all documents
-              await this.vectorStore.delete({});
-              console.log(`[VectorStore] Fallback: deleted all documents from collection`);
-              this.vectorStore = null;
-            }
-          } catch (fetchError) {
-            console.warn(`[VectorStore] REST API delete failed:`, fetchError);
-            // Fallback: try to delete all documents from local vector store
-            try {
-              if (this.vectorStore) {
-                await this.vectorStore.delete({});
-                console.log(`[VectorStore] Fallback: deleted all documents from collection`);
-                this.vectorStore = null;
-              }
-            } catch (localError) {
-              console.error(`[VectorStore] Local delete also failed:`, localError);
-              throw new Error(`Failed to delete collection via REST API and local fallback: ${localError instanceof Error ? localError.message : 'Unknown error'}`);
-            }
-          }
-        } else {
-          // In-memory store: delete all documents
-          await this.vectorStore.delete({});
-          console.log(`[VectorStore] Deleted all documents from in-memory collection`);
+        if (response.ok) {
+          console.log(`[VectorStore] Collection deleted successfully via REST API`);
+          // Reset vector store reference since collection is gone
           this.vectorStore = null;
+        } else {
+          console.warn(`[VectorStore] REST API delete returned status ${response.status}`);
+          // Fallback: try to delete all documents
+          await this.vectorStore.delete({});
+          console.log(`[VectorStore] Fallback: deleted all documents from collection`);
         }
       } else {
         console.log(`[VectorStore] No collection to clear`);

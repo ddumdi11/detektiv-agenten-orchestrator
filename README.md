@@ -2,11 +2,6 @@
 
 Desktop application that uses cloud-based LLMs (detective agents) to systematically interrogate document-based knowledge through advanced RAG (Retrieval-Augmented Generation) technology.
 
-## Contributors
-
-- **ddumdi11** - Project creator and main developer
-- **Kilo Code** (Grok xAI) - AI assistant and co-developer, contributed to core interrogation logic, real-time progress updates, and UI enhancements
-
 ## Features
 
 ### Core Functionality

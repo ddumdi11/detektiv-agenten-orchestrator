@@ -40,13 +40,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Document methods
   documents: {
-    upload: (fileData: {
-      name: string;
-      type: string;
-      size: number;
-      lastModified: number;
-      data: ArrayBuffer;
-    }) => ipcRenderer.invoke('documents:upload', fileData),
+    upload: (file: File) => ipcRenderer.invoke('documents:upload', file),
 
     list: () => ipcRenderer.invoke('documents:list'),
 
