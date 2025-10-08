@@ -3,11 +3,13 @@ import type { DocumentSource } from '../preload';
 
 interface DocumentManagementProps {
   onDocumentSelect?: (document: DocumentSource) => void;
+  onDocumentDeleted?: (documentId: string) => void;
   selectedDocumentId?: string;
 }
 
 export const DocumentManagement: React.FC<DocumentManagementProps> = ({
   onDocumentSelect,
+  onDocumentDeleted,
   selectedDocumentId,
 }) => {
   const [documents, setDocuments] = useState<DocumentSource[]>([]);
@@ -137,6 +139,9 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({
         delete newProgress[documentId];
         return newProgress;
       });
+      if (selectedDocumentId === documentId) {
+        onDocumentDeleted?.(documentId);
+      }
     } catch (error) {
       console.error('Delete failed:', error);
       alert(`Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

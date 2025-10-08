@@ -204,6 +204,7 @@ const App: React.FC = () => {
             {witnessMode === 'langchain' && (
               <DocumentManagement
                 onDocumentSelect={handleDocumentSelect}
+                onDocumentDeleted={() => setSelectedDocument(null)}
                 selectedDocumentId={selectedDocument?.id}
               />
             )}

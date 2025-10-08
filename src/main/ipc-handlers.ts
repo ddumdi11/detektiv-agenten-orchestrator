@@ -500,7 +500,7 @@ export const ipcHandlers = {
 
     // Create temporary file path in user data directory (writable in production)
     const userDataDir = app.getPath('userData');
-    const tempDir = path.join(userDataDir, 'temp-documents');
+    let tempDir = path.join(userDataDir, 'temp-documents');
     try {
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
@@ -512,7 +512,7 @@ export const ipcHandlers = {
       if (!fs.existsSync(fallbackDir)) {
         fs.mkdirSync(fallbackDir, { recursive: true });
       }
-      throw new Error(`Cannot create temp directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      tempDir = fallbackDir;
     }
 
     const filePath = path.join(tempDir, `${randomUUID()}-${fileData.name}`);
